@@ -18,9 +18,6 @@
                     </span>
                     <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($room->is_playing_fallback ? $room->fallback_playlist_name : 'Nothing queued yet') }}</h2>
                     <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Playlist · shuffled' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track')) }}</p>
-                    @if ($room->is_playing_fallback && $this->nowPlaying)
-                        <p class="text-[11px] text-aux-accent mt-0.5">Playing from {{ $room->fallback_playlist_name }}</p>
-                    @endif
 
                     @if ($this->nowPlaying || $room->is_playing_fallback)
                         <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint"
@@ -124,11 +121,11 @@
             @if ($room->shuffle_enabled && $playlistItems->isNotEmpty())
                 <p class="mt-5 pt-4 border-t border-aux-border text-[11px] text-aux-faint">
                     <x-icon name="shuffle" class="w-3 h-3 inline -mt-0.5" />
-                    Shuffle is on, so Spotify doesn't report the real shuffled order. Upcoming tracks from {{ $room->fallback_playlist_name }} can't be shown reliably here, but songs queued above are unaffected.
+                    Shuffle is on, so Spotify doesn't report the real shuffled order. Upcoming tracks from the playlist can't be shown reliably here, but songs queued above are unaffected.
                 </p>
             @elseif ($playlistItems->isNotEmpty())
                 <p class="mt-5 pt-4 border-t border-aux-border text-[10px] uppercase tracking-widest text-aux-faint">
-                    Coming up from {{ $room->fallback_playlist_name }}
+                    Coming up from the playlist
                 </p>
                 <ul class="mt-2 divide-y divide-white/5">
                     @foreach ($playlistItems as $item)
@@ -250,21 +247,6 @@
                 <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify. Added songs play next without interrupting it.</p>
 
-                @if ($room->fallback_playlist_uri)
-                    <div class="mt-3 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-md bg-aux-card-hover flex items-center justify-center overflow-hidden shrink-0">
-                            @if ($room->fallback_playlist_image_url)
-                                <img src="{{ $room->fallback_playlist_image_url }}" class="w-full h-full object-cover" alt="">
-                            @else
-                                <x-icon name="queue-list" class="w-4 h-4 text-aux-faint" />
-                            @endif
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
-                        </div>
-                    </div>
-                @endif
-
                 <div class="mt-3 relative">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-aux-faint">
                         <x-icon name="search" class="w-4 h-4" />
@@ -301,22 +283,6 @@
                         @endforeach
                     </ul>
                 @endif
-            </div>
-        @elseif ($room->fallback_playlist_uri)
-            <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
-                <h3 class="font-semibold">Playlist</h3>
-                <div class="mt-3 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-md bg-aux-card-hover flex items-center justify-center overflow-hidden shrink-0">
-                        @if ($room->fallback_playlist_image_url)
-                            <img src="{{ $room->fallback_playlist_image_url }}" class="w-full h-full object-cover" alt="">
-                        @else
-                            <x-icon name="queue-list" class="w-4 h-4 text-aux-faint" />
-                        @endif
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
-                    </div>
-                </div>
             </div>
         @endif
 

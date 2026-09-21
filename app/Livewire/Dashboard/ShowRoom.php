@@ -180,7 +180,13 @@ class ShowRoom extends Component
         // timer — a locally-computed "track probably ended" guess would
         // race with Spotify's own native queue advancing on its own,
         // restarting an already-correctly-playing track from position 0.
-        if ($this->isHost) {
+        //
+        // Skipped entirely for a few seconds after any local command: the
+        // Spotify API has a well-known read-after-write lag, so a poll
+        // landing right after play/pause/skip can still read the old state
+        // and immediately overwrite the correct local one with it — the
+        // command visibly "undoing itself" a moment after being pressed.
+        if ($this->isHost && ! $this->room->commandedRecently()) {
             $this->syncWithSpotify();
         }
 
@@ -633,6 +639,7 @@ class ShowRoom extends Component
                 $this->room->update([
                     'is_playing' => true,
                     'now_playing_started_at' => now()->subMilliseconds($this->room->now_playing_position_ms),
+                    'last_local_command_at' => now(),
                 ]);
 
                 $this->logActivity('played', "Playback resumed: \"{$this->room->now_playing_name}\".");
@@ -704,6 +711,7 @@ class ShowRoom extends Component
         $this->room->update([
             'is_playing' => false,
             'now_playing_position_ms' => $position,
+            'last_local_command_at' => now(),
         ]);
 
         $this->logActivity('paused', 'Playback paused.');
@@ -727,6 +735,7 @@ class ShowRoom extends Component
             return;
         }
 
+        $this->room->update(['last_local_command_at' => now()]);
         $this->logActivity('skipped', "{$this->member->display_name} skipped the track.");
         $this->syncWithSpotify();
         $this->broadcastUpdate('playback');
@@ -744,6 +753,7 @@ class ShowRoom extends Component
             return;
         }
 
+        $this->room->update(['last_local_command_at' => now()]);
         $this->logActivity('skipped', "{$this->member->display_name} went back a track.");
         $this->syncWithSpotify();
         $this->broadcastUpdate('playback');
@@ -763,7 +773,7 @@ class ShowRoom extends Component
             return;
         }
 
-        $this->room->update(['shuffle_enabled' => $enabled]);
+        $this->room->update(['shuffle_enabled' => $enabled, 'last_local_command_at' => now()]);
         $this->broadcastUpdate('playback');
     }
 
@@ -782,7 +792,7 @@ class ShowRoom extends Component
             return;
         }
 
-        $this->room->update(['repeat_mode' => $next]);
+        $this->room->update(['repeat_mode' => $next, 'last_local_command_at' => now()]);
         $this->broadcastUpdate('playback');
     }
 
@@ -805,6 +815,7 @@ class ShowRoom extends Component
         $this->room->update([
             'now_playing_position_ms' => $ms,
             'now_playing_started_at' => $this->room->is_playing ? now()->subMilliseconds($ms) : null,
+            'last_local_command_at' => now(),
         ]);
 
         $this->broadcastUpdate('playback');
@@ -1154,6 +1165,7 @@ class ShowRoom extends Component
             'now_playing_position_ms' => $positionMs,
             'is_playing' => true,
             'is_playing_fallback' => false,
+            'last_local_command_at' => now(),
         ]);
 
         return true;
@@ -1196,6 +1208,7 @@ class ShowRoom extends Component
             'now_playing_position_ms' => 0,
             'is_playing' => true,
             'is_playing_fallback' => true,
+            'last_local_command_at' => now(),
         ]);
 
         $this->logActivity('played', "Fallback playlist started: \"{$this->room->fallback_playlist_name}\".");

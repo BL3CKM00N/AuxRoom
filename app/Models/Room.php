@@ -34,6 +34,7 @@ class Room extends Model
         'now_playing_duration_ms',
         'now_playing_started_at',
         'now_playing_position_ms',
+        'last_local_command_at',
         'is_playing',
         'shuffle_enabled',
         'repeat_mode',
@@ -52,6 +53,7 @@ class Room extends Model
             'location_lng' => 'float',
             'closed_at' => 'datetime',
             'now_playing_started_at' => 'datetime',
+            'last_local_command_at' => 'datetime',
             'is_playing' => 'boolean',
         ];
     }
@@ -146,6 +148,20 @@ class Room extends Model
         }
 
         return (int) $this->now_playing_started_at->diffInMilliseconds(Carbon::now(), true);
+    }
+
+    /**
+     * Spotify's own API has a well-known read-after-write lag — a GET right
+     * after a play/pause/skip command can still report the old state for a
+     * second or two. Polling that lags into a just-issued command looks
+     * indistinguishable from a genuine external change, so background sync
+     * gives every local command a short grace window before trusting a
+     * fresh read over it again.
+     */
+    public function commandedRecently(): bool
+    {
+        return $this->last_local_command_at
+            && $this->last_local_command_at->diffInSeconds(Carbon::now()) < 4;
     }
 
     public function hasLocationBoundary(): bool
