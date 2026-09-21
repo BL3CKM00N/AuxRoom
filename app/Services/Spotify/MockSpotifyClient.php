@@ -29,6 +29,11 @@ class MockSpotifyClient implements SpotifyClientContract
         return true;
     }
 
+    public function playContextAtTrack(string $contextUri, string $trackUri, int $positionMs, ?string $deviceId = null): bool
+    {
+        return true;
+    }
+
     public function resumeContext(string $contextUri, string $trackUri, int $positionMs, bool $shuffle, ?string $deviceId = null): bool
     {
         return true;

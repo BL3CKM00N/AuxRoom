@@ -66,15 +66,26 @@ class SpotifyWebApiClient implements SpotifyClientContract
     }
 
     /**
-     * Resumes a specific track inside a context (a playlist) at an exact
+     * Plays a specific track inside a context (a playlist) at a given
      * position, instead of replacing the context with a single bare track
-     * URI. A bare `uris:[trackUri]` play — what this used to do — wipes out
-     * the context entirely: once that track ends, Spotify has nothing left
-     * to advance to, so every future resume just replays that same
-     * context-less track forever. `offset` + `position_ms` inside a
-     * `context_uri` play resumes the exact same spot while keeping the
-     * context (and its native auto-advance) intact.
+     * URI. A bare `uris:[trackUri]` play wipes out the context entirely:
+     * once that track ends, Spotify has nothing left to advance to. `offset`
+     * + `position_ms` inside a `context_uri` play jumps to that exact spot
+     * while keeping the context (and its native auto-advance) intact — the
+     * same thing clicking a track inside a playlist does in Spotify itself.
      */
+    public function playContextAtTrack(string $contextUri, string $trackUri, int $positionMs, ?string $deviceId = null): bool
+    {
+        $query = $deviceId ? ['device_id' => $deviceId] : [];
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, [
+            'context_uri' => $contextUri,
+            'offset' => ['uri' => $trackUri],
+            'position_ms' => $positionMs,
+        ]);
+    }
+
+    /** Resumes exactly where a fallback-playlist track was paused, preserving its stored shuffle state. */
     public function resumeContext(string $contextUri, string $trackUri, int $positionMs, bool $shuffle, ?string $deviceId = null): bool
     {
         $query = $deviceId ? ['device_id' => $deviceId] : [];
@@ -84,11 +95,7 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'state' => $shuffle ? 'true' : 'false',
         ], []);
 
-        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, [
-            'context_uri' => $contextUri,
-            'offset' => ['uri' => $trackUri],
-            'position_ms' => $positionMs,
-        ]);
+        return $this->playContextAtTrack($contextUri, $trackUri, $positionMs, $deviceId);
     }
 
     public function pause(?string $deviceId = null): bool

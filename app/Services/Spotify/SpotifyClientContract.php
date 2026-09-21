@@ -17,11 +17,15 @@ interface SpotifyClientContract
     public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool;
 
     /**
-     * Resumes a specific track inside a context (a playlist) at an exact
-     * position, without replacing the context with a bare track URI —
-     * that would permanently sever it, leaving Spotify with nothing to
-     * naturally advance to once the track ends.
+     * Jumps to and plays a specific track inside a context (a playlist),
+     * without replacing the context with a bare track URI — that would
+     * permanently sever it, leaving Spotify with nothing to naturally
+     * advance to once the track ends. The same thing clicking a track
+     * inside a playlist does in Spotify itself.
      */
+    public function playContextAtTrack(string $contextUri, string $trackUri, int $positionMs, ?string $deviceId = null): bool;
+
+    /** Resumes exactly where a fallback-playlist track was paused, preserving its stored shuffle state. */
     public function resumeContext(string $contextUri, string $trackUri, int $positionMs, bool $shuffle, ?string $deviceId = null): bool;
 
     public function pause(?string $deviceId = null): bool;
