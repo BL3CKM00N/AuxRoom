@@ -29,10 +29,9 @@ new class extends Component
         <div class="flex justify-between h-16">
             <div class="flex">
                 <!-- Logo -->
-                <div class="shrink-0 flex items-center gap-2 text-aux-text">
-                    <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2">
-                        <span class="text-aux-accent"><x-icon name="zap" class="w-6 h-6" /></span>
-                        <span class="font-semibold">AuxRoom</span>
+                <div class="shrink-0 flex items-center text-aux-text">
+                    <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center">
+                        <x-logo class="h-6" />
                     </a>
                 </div>
 

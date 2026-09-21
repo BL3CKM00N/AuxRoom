@@ -6,26 +6,22 @@
 
         <title>AuxRoom</title>
 
+        <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="antialiased font-sans bg-aux-bg text-aux-text">
-        <div class="aurora" aria-hidden="true">
-            <span class="aurora__glow aurora__glow--1"></span>
-            <span class="aurora__glow aurora__glow--2"></span>
-            <span class="aurora__glow aurora__glow--3"></span>
-        </div>
-
         <div class="relative min-h-screen flex flex-col">
             <header class="max-w-5xl mx-auto w-full px-6 py-8 flex items-center justify-between">
-                <a href="/" class="font-semibold text-lg flex items-center gap-2">
-                    <span class="text-aux-accent"><x-icon name="zap" class="w-6 h-6" /></span> AuxRoom
+                <a href="/" class="flex items-center">
+                    <x-logo class="h-6" />
                 </a>
                 <nav class="flex items-center gap-4 text-sm text-aux-muted">
                     @auth
-                        <a href="{{ route('dashboard') }}" wire:navigate class="hover:text-aux-text">Your rooms</a>
+                        <a href="{{ route('dashboard') }}" wire:navigate class="hover:text-aux-text">Your room</a>
                     @else
                         <a href="{{ route('login') }}" wire:navigate class="hover:text-aux-text">Log in</a>
                         <a href="{{ route('register') }}" wire:navigate class="hover:text-aux-text">Sign up</a>

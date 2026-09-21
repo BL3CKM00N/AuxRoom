@@ -7,6 +7,8 @@
 
         <title>{{ config('app.name', 'AuxRoom') }}</title>
 
+        <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
@@ -17,9 +19,8 @@
     <body class="font-sans text-aux-text antialiased bg-aux-bg">
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0">
             <div>
-                <a href="/" wire:navigate class="flex items-center gap-2 text-aux-text">
-                    <span class="text-aux-accent"><x-icon name="zap" class="w-8 h-8" /></span>
-                    <span class="font-semibold text-xl">AuxRoom</span>
+                <a href="/" wire:navigate class="flex items-center text-aux-text">
+                    <x-logo class="h-8" />
                 </a>
             </div>
 

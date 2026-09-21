@@ -23,9 +23,8 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex">
-                        <div class="shrink-0 flex items-center gap-2 text-aux-text">
-                            <span class="text-aux-accent"><x-icon name="zap" class="w-6 h-6" /></span>
-                            <span class="font-semibold">AuxRoom</span>
+                        <div class="shrink-0 flex items-center text-aux-text">
+                            <x-logo class="h-6" />
                         </div>
 
                         <div class="hidden lg:flex items-center space-x-8 sm:ms-10">
