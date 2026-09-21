@@ -194,7 +194,7 @@ class SpotifyWebApiClient implements SpotifyClientContract
     }
 
     /**
-     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}>
+     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: ?int}>
      */
     private function mapPlaylists(array $playlists): array
     {
@@ -202,7 +202,7 @@ class SpotifyWebApiClient implements SpotifyClientContract
     }
 
     /**
-     * @return array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}
+     * @return array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: ?int}
      */
     private function mapPlaylist(array $playlist): array
     {
@@ -212,7 +212,10 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'name' => $playlist['name'],
             'owner' => $playlist['owner']['display_name'] ?? null,
             'image_url' => $playlist['images'][0]['url'] ?? null,
-            'track_count' => $playlist['tracks']['total'] ?? 0,
+            // Spotify's search and "my playlists" endpoints frequently omit
+            // an accurate total (only the full single-playlist fetch always
+            // has it) — null here means "unknown", not "empty".
+            'track_count' => $playlist['tracks']['total'] ?? null,
         ];
     }
 

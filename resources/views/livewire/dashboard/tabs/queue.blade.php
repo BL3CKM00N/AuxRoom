@@ -235,7 +235,7 @@
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate text-sm font-medium">{{ $p['name'] }}</p>
-                                    <p class="truncate text-xs text-aux-faint">{{ $p['owner'] }} &middot; {{ $p['track_count'] }} tracks</p>
+                                    <p class="truncate text-xs text-aux-faint">{{ $p['owner'] }}{{ $p['track_count'] !== null ? ' · '.$p['track_count'].' tracks' : '' }}</p>
                                 </div>
                                 <button wire:click="selectFallbackPlaylist({{ $i }})"
                                         class="shrink-0 px-2.5 py-1 rounded-full bg-aux-accent text-black text-xs font-semibold">

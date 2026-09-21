@@ -23,17 +23,17 @@ interface SpotifyClientContract
     public function setVolume(int $percent, ?string $deviceId = null): bool;
 
     /**
-     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}>
+     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: ?int}>
      */
     public function searchPlaylists(string $query, int $limit = 8): array;
 
     /**
-     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}>
+     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: ?int}>
      */
     public function myPlaylists(int $limit = 50): array;
 
     /**
-     * @return array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}|null
+     * @return array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: ?int}|null
      */
     public function getPlaylist(string $id): ?array;
 

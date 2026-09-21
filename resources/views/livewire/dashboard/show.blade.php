@@ -161,7 +161,26 @@
 
         <div class="hidden md:flex items-center gap-3 w-48 justify-end shrink-0">
             <button wire:click="setTab('queue')" class="text-aux-muted hover:text-aux-text"><x-icon name="queue-list" class="w-4 h-4" /></button>
-            <span class="text-aux-muted"><x-icon name="device" class="w-4 h-4" /></span>
+            @if ($this->isHost)
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" class="text-aux-muted hover:text-aux-text">
+                        <x-icon name="device" class="w-4 h-4" />
+                    </button>
+                    <div x-show="open" x-cloak @click.outside="open = false"
+                         class="absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-aux-card-hover border border-aux-border shadow-xl p-1 z-30">
+                        @forelse ($this->devices as $device)
+                            <button wire:click="selectDevice('{{ $device['id'] }}', '{{ $device['name'] }}')"
+                                    class="w-full text-left text-xs px-3 py-2 rounded-md {{ ($room->playbackProvider?->spotifyAccount?->active_device_id ?? null) === $device['id'] ? 'bg-aux-accent-soft text-aux-accent' : 'hover:bg-white/5' }}">
+                                {{ $device['name'] }}
+                            </button>
+                        @empty
+                            <p class="text-xs text-aux-faint px-3 py-2">No devices found — open Spotify somewhere first.</p>
+                        @endforelse
+                    </div>
+                </div>
+            @else
+                <span class="text-aux-faint opacity-40"><x-icon name="device" class="w-4 h-4" /></span>
+            @endif
             <x-icon name="volume" class="w-4 h-4 {{ $this->canGuest('guests_can_set_volume') ? 'text-aux-muted' : 'text-aux-faint opacity-40' }}" />
             <input type="range" min="0" max="100" value="{{ $room->volume_percent }}" @disabled(! $this->canGuest('guests_can_set_volume'))
                    style="background: linear-gradient(to right, #22c55e {{ $room->volume_percent }}%, rgba(255,255,255,0.12) {{ $room->volume_percent }}%)"
