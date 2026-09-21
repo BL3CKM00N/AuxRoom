@@ -121,7 +121,12 @@
                 @endforelse
             </ul>
 
-            @if ($playlistItems->isNotEmpty())
+            @if ($room->shuffle_enabled && $playlistItems->isNotEmpty())
+                <p class="mt-5 pt-4 border-t border-aux-border text-[11px] text-aux-faint">
+                    <x-icon name="shuffle" class="w-3 h-3 inline -mt-0.5" />
+                    Shuffle is on, so Spotify doesn't report the real shuffled order. Upcoming tracks from {{ $room->fallback_playlist_name }} can't be shown reliably here, but songs queued above are unaffected.
+                </p>
+            @elseif ($playlistItems->isNotEmpty())
                 <p class="mt-5 pt-4 border-t border-aux-border text-[10px] uppercase tracking-widest text-aux-faint">
                     Coming up from {{ $room->fallback_playlist_name }}
                 </p>

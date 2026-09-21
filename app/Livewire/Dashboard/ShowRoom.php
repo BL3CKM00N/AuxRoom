@@ -618,18 +618,37 @@ class ShowRoom extends Component
             return;
         }
 
-        // Paused mid-playlist — reshuffling on resume is an acceptable
-        // trade-off for not tracking exactly where a shuffled context was.
-        if ($this->room->is_playing_fallback && $this->room->fallback_playlist_uri) {
-            if ($this->startFallbackPlayback()) {
-                $this->syncWithSpotify();
+        // A paused device remembers exactly what it was playing — context,
+        // queue and position — so resuming bare (no body) picks up exactly
+        // where it left off. Re-issuing a track or context here instead
+        // (the old approach) replaced the device's native queue every time
+        // and, for a shuffled playlist, restarted it from a new random
+        // point that looked like the track had skipped ahead.
+        if ($this->room->now_playing_track_id) {
+            if (app(SpotifyClientFactory::class)->forRoom($this->room)->resume($this->providerDeviceId())) {
+                $this->room->update([
+                    'is_playing' => true,
+                    'now_playing_started_at' => now()->subMilliseconds($this->room->now_playing_position_ms),
+                ]);
+
+                $this->logActivity('played', "Playback resumed: \"{$this->room->now_playing_name}\".");
                 $this->broadcastUpdate('playback');
+
+                return;
             }
 
-            return;
-        }
+            // Bare resume only fails when Spotify has genuinely dropped the
+            // paused state (e.g. after a long gap) — fall back to an
+            // explicit restart in that case.
+            if ($this->room->is_playing_fallback && $this->room->fallback_playlist_uri) {
+                if ($this->startFallbackPlayback()) {
+                    $this->syncWithSpotify();
+                    $this->broadcastUpdate('playback');
+                }
 
-        if ($this->room->now_playing_track_id) {
+                return;
+            }
+
             if (! $this->playTrackAt(
                 $this->room->now_playing_track_id,
                 $this->room->now_playing_name ?? 'Unknown track',

@@ -16,6 +16,16 @@ interface SpotifyClientContract
 
     public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool;
 
+    /**
+     * Bare resume — a PUT to /player/play with no body, resuming exactly
+     * where Spotify's device already paused, without touching context or
+     * queue. This is what native Spotify clients do on unpause; re-issuing
+     * a track or context on every resume (the old approach) wiped the
+     * native "up next" queue and, for a shuffled context, restarted it
+     * from a new random point that looked like a skip.
+     */
+    public function resume(?string $deviceId = null): bool;
+
     public function pause(?string $deviceId = null): bool;
 
     public function seek(int $positionMs, ?string $deviceId = null): bool;

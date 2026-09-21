@@ -42,7 +42,13 @@
                 </div>
             @endif
 
-            @if ($this->upNext->isNotEmpty())
+            @if ($room->shuffle_enabled)
+                <div class="mt-10">
+                    <p class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-aux-faint">
+                        <x-icon name="shuffle" class="w-4 h-4" /> Shuffle is on, up next is a surprise
+                    </p>
+                </div>
+            @elseif ($this->upNext->isNotEmpty())
                 <div class="mt-10">
                     <p class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-aux-accent">
                         <x-icon name="queue-list" class="w-4 h-4" /> Coming up next

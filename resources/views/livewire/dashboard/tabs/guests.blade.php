@@ -7,8 +7,7 @@
     </p>
 </div>
 
-<div class="grid gap-6 lg:grid-cols-3">
-    <div class="lg:col-span-2 space-y-6">
+<div class="space-y-6">
 
     @if ($this->isHost)
         <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
@@ -129,21 +128,5 @@
         <p class="mt-4 pt-4 border-t border-aux-border text-xs text-aux-faint">
             Location exceptions apply to this browser session, including when offline. Rejoining needs fresh approval. Approved people can control from anywhere.
         </p>
-    </div>
-
-    </div>
-
-    <div class="space-y-6">
-        <div class="p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col items-center text-center">
-            <div class="p-3 bg-white rounded-lg">
-                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)->generate(route('join', ['code' => $room->invite_code])) !!}
-            </div>
-            <p class="mt-3 text-sm font-medium">Scan to join the room</p>
-            <p class="mt-1 text-lg font-bold tracking-wide">{{ $room->invite_code }}</p>
-        </div>
-
-        @if ($this->canGuest('guests_can_view_activity'))
-            @include('livewire.dashboard.tabs.partials.activity')
-        @endif
     </div>
 </div>

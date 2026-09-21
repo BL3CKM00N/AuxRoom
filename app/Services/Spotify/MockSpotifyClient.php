@@ -29,6 +29,11 @@ class MockSpotifyClient implements SpotifyClientContract
         return true;
     }
 
+    public function resume(?string $deviceId = null): bool
+    {
+        return true;
+    }
+
     public function pause(?string $deviceId = null): bool
     {
         return true;

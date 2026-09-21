@@ -41,6 +41,31 @@
     </div>
 </div>
 
+{{-- Emergency stop: the one control a host may need to reach instantly, kept at the very top --}}
+<div class="p-5 rounded-xl bg-red-500/10 border border-red-500/30">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <x-icon name="zap" class="w-4 h-4 text-red-400" />
+            <h3 class="font-semibold">Emergency stop</h3>
+        </div>
+        @unless ($room->guests_can_add_to_queue)
+            <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">QUEUE LOCKED</span>
+        @endunless
+    </div>
+    <p class="mt-1 text-xs text-aux-muted">
+        Instantly stop everyone from adding songs, overriding individual permissions. Use this if something inappropriate gets added.
+    </p>
+    @if ($room->guests_can_add_to_queue)
+        <button wire:click="emergencyStopQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-400">
+            Lock the queue now
+        </button>
+    @else
+        <button wire:click="reopenQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-900 text-white text-sm font-semibold hover:bg-red-800">
+            Unlock the queue
+        </button>
+    @endif
+</div>
+
 <div class="grid gap-4 lg:grid-cols-3">
     <div class="lg:col-span-2 p-6 rounded-xl bg-aux-card border border-aux-border">
         <div class="flex items-center justify-between">
@@ -151,31 +176,6 @@
             Open Guest Portal <x-icon name="chevron-right" class="w-3 h-3" />
         </span>
     </button>
-
-    {{-- Emergency stop --}}
-    <div class="w-full p-5 rounded-xl bg-red-500/10 border border-red-500/30">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <x-icon name="zap" class="w-4 h-4 text-red-400" />
-                <h3 class="font-semibold">Emergency stop</h3>
-            </div>
-            @unless ($room->guests_can_add_to_queue)
-                <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">QUEUE LOCKED</span>
-            @endunless
-        </div>
-        <p class="mt-1 text-xs text-aux-muted">
-            Instantly stop everyone from adding songs, overriding individual permissions. Use this if something inappropriate gets added.
-        </p>
-        @if ($room->guests_can_add_to_queue)
-            <button wire:click="emergencyStopQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-400">
-                Lock the queue now
-            </button>
-        @else
-            <button wire:click="reopenQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-900 text-white text-sm font-semibold hover:bg-red-800">
-                Unlock the queue
-            </button>
-        @endif
-    </div>
 
     {{-- Playback device --}}
     <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border" x-data="{ open: false }">
