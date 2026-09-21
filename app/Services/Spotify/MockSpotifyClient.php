@@ -68,4 +68,9 @@ class MockSpotifyClient implements SpotifyClientContract
     {
         return null;
     }
+
+    public function addToPlaybackQueue(string $uri, ?string $deviceId = null): bool
+    {
+        return true;
+    }
 }

@@ -40,13 +40,20 @@ interface SpotifyClientContract
     public function playContext(string $contextUri, ?string $deviceId, bool $shuffle = true): bool;
 
     /**
+     * Adds a track to Spotify's own native playback queue — the same
+     * mechanism behind "swipe right to queue" in the Spotify app. Plays
+     * next, after whatever's currently going, without interrupting it.
+     */
+    public function addToPlaybackQueue(string $uri, ?string $deviceId = null): bool;
+
+    /**
      * The real, current playback state as Spotify sees it right now — used
      * to detect changes made outside AuxRoom (pausing/seeking from the
      * Spotify app itself, switching to a different track on another
      * device, etc). Includes full track metadata so the room can display
      * exactly what's playing even if it wasn't added through AuxRoom.
      *
-     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int}|null
+     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int, context_uri: ?string}|null
      */
     public function getPlaybackState(): ?array;
 }

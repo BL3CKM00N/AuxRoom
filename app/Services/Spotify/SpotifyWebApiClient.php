@@ -160,6 +160,23 @@ class SpotifyWebApiClient implements SpotifyClientContract
         ]);
     }
 
+    public function addToPlaybackQueue(string $uri, ?string $deviceId = null): bool
+    {
+        $query = ['uri' => $uri];
+
+        if ($deviceId) {
+            $query['device_id'] = $deviceId;
+        }
+
+        $response = $this->http()->post('https://api.spotify.com/v1/me/player/queue?'.http_build_query($query));
+
+        if ($response->failed()) {
+            Log::warning('Spotify add-to-queue failed', ['status' => $response->status(), 'body' => $response->body()]);
+        }
+
+        return $response->successful();
+    }
+
     public function getPlaybackState(): ?array
     {
         $response = $this->http()->get('https://api.spotify.com/v1/me/player');
@@ -190,6 +207,7 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'artist' => collect($item['artists'] ?? [])->pluck('name')->join(', ') ?: null,
             'album_art_url' => $item['album']['images'][0]['url'] ?? null,
             'duration_ms' => (int) ($item['duration_ms'] ?? 0),
+            'context_uri' => $json['context']['uri'] ?? null,
         ];
     }
 
