@@ -216,61 +216,45 @@ class ShowRoom extends Component
         // Spotify's own context tells us, authoritatively, whether it's
         // currently playing from the selected playlist — rather than
         // trusting a locally-toggled flag that can go stale once native
-        // queue items start interleaving with the underlying context. This
-        // is purely an informational badge now — the actual track always
-        // gets tracked the same way below, regardless of where it's from.
+        // queue items start interleaving with the underlying context.
         $isFallbackContext = $this->room->fallback_playlist_uri
             && $state['context_uri'] === $this->room->fallback_playlist_uri;
 
-        $current = $this->room->nowPlaying;
-        $trackChanged = $state['track_id'] && $current?->spotify_track_id !== $state['track_id'];
-
-        $nowPlayingQueueItemId = $this->room->now_playing_queue_item_id;
+        $trackChanged = $state['track_id'] !== $this->room->now_playing_track_id;
+        $queueItemId = $this->room->now_playing_queue_item_id;
 
         if ($trackChanged) {
-            $matched = $this->room->pendingQueueItems()->where('spotify_track_id', $state['track_id'])->first();
+            // Look up whether a guest explicitly queued this, purely for
+            // "added by" attribution — Spotify's own queue/context is the
+            // source of truth for order and content, never reconstructed
+            // locally (that's what caused the queue to go backwards before).
+            $matched = $state['track_id']
+                ? $this->room->queueItems()->where('spotify_track_id', $state['track_id'])->whereNull('played_at')->first()
+                : null;
 
-            if (! $matched) {
-                // Playing a track we have no record of — from the shuffled
-                // playlist, started directly from Spotify, another device,
-                // etc — track it like any other item so Now Playing, seek,
-                // and skip all work the same regardless of where it's from.
-                $matched = $this->room->queueItems()->create([
-                    'added_by_id' => null,
-                    'spotify_track_id' => $state['track_id'],
-                    'name' => $state['name'] ?? 'Unknown track',
-                    'artist' => $state['artist'] ?? '',
-                    'album_art_url' => $state['album_art_url'] ?? null,
-                    'duration_ms' => $state['duration_ms'] ?? 0,
-                    // Sorts ahead of anything already queued, since it's
-                    // what's playing right now, not something upcoming.
-                    'position' => (int) ($this->room->pendingQueueItems()->min('position') ?? 1) - 1,
-                ]);
+            $matched?->update(['played_at' => now()]);
+            $queueItemId = $matched?->id;
 
-                if (! $isFallbackContext) {
-                    $this->logActivity('played', "Now playing from Spotify: \"{$matched->name}\".");
-                }
+            if (! $isFallbackContext && ! $matched && $state['track_id']) {
+                $this->logActivity('played', "Now playing from Spotify: \"{$state['name']}\".");
             }
-
-            $this->room->queueItems()
-                ->whereNull('played_at')
-                ->where('position', '<', $matched->position)
-                ->update(['played_at' => now()]);
-
-            $nowPlayingQueueItemId = $matched->id;
         }
 
         $drifted = abs($state['progress_ms'] - $this->room->currentPositionMs()) > 3000;
         $playStateChanged = $state['is_playing'] !== $this->room->is_playing;
         $fallbackFlagChanged = $isFallbackContext !== $this->room->is_playing_fallback;
-        $queueItemChanged = $nowPlayingQueueItemId !== $this->room->now_playing_queue_item_id;
 
-        if (! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $queueItemChanged) {
+        if (! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged) {
             return;
         }
 
         $this->room->update([
-            'now_playing_queue_item_id' => $nowPlayingQueueItemId,
+            'now_playing_queue_item_id' => $queueItemId,
+            'now_playing_track_id' => $state['track_id'],
+            'now_playing_name' => $state['name'],
+            'now_playing_artist' => $state['artist'],
+            'now_playing_album_art_url' => $state['album_art_url'],
+            'now_playing_duration_ms' => $state['duration_ms'],
             'is_playing_fallback' => $isFallbackContext,
             'is_playing' => $state['is_playing'],
             'now_playing_position_ms' => $state['progress_ms'],
@@ -364,9 +348,37 @@ class ShowRoom extends Component
         return $this->members->filter(fn (RoomMember $m) => $m->isOnline())->count();
     }
 
+    /**
+     * "Up Next" is Spotify's own live queue, not a local reconstruction —
+     * rebuilding it from locally-tracked positions is what caused it to
+     * play backwards once Previous/Next could move either direction.
+     * Attribution ("added by") is looked up per track, but never used to
+     * decide order or content.
+     */
     public function getQueueProperty()
     {
-        return $this->room->pendingQueueItems()->with('addedBy')->get();
+        if ($this->isMock || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
+            return collect();
+        }
+
+        $upcoming = app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue();
+
+        return collect($upcoming)->map(function (array $track) {
+            $addedBy = $this->room->queueItems()
+                ->where('spotify_track_id', $track['id'])
+                ->whereNull('played_at')
+                ->with('addedBy')
+                ->first()?->addedBy?->display_name;
+
+            return (object) [
+                'spotify_track_id' => $track['id'],
+                'name' => $track['name'],
+                'artist' => $track['artist'],
+                'album_art_url' => $track['album_art_url'],
+                'duration_ms' => $track['duration_ms'],
+                'added_by_name' => $addedBy,
+            ];
+        });
     }
 
     public function getActivityProperty()
@@ -374,9 +386,9 @@ class ShowRoom extends Component
         return $this->room->activityEvents()->latest()->limit(30)->get();
     }
 
-    public function getNowPlayingProperty(): ?QueueItem
+    public function getNowPlayingProperty(): ?object
     {
-        return $this->room->nowPlaying;
+        return $this->room->nowPlayingDetails();
     }
 
     public function getCurrentPositionMsProperty(): int
@@ -460,7 +472,7 @@ class ShowRoom extends Component
 
         $this->logActivity('queued', "{$this->member->display_name} added \"{$item->name}\" to the queue.");
 
-        if (! $this->room->now_playing_queue_item_id && ! $this->room->is_playing) {
+        if (! $this->room->now_playing_track_id && ! $this->room->is_playing) {
             // Nothing playing at all yet — this is the first song, so start it.
             $this->startPlayback($item);
         } else {
@@ -595,18 +607,35 @@ class ShowRoom extends Component
             return;
         }
 
-        if ($this->room->now_playing_queue_item_id && ! $this->room->is_playing) {
-            $item = $this->room->nowPlaying;
+        if ($this->room->is_playing) {
+            return;
+        }
 
-            if (! $item) {
+        // Paused mid-playlist — reshuffling on resume is an acceptable
+        // trade-off for not tracking exactly where a shuffled context was.
+        if ($this->room->is_playing_fallback && $this->room->fallback_playlist_uri) {
+            if ($this->startFallbackPlayback()) {
+                $this->syncWithSpotify();
+                $this->broadcastUpdate('playback');
+            }
+
+            return;
+        }
+
+        if ($this->room->now_playing_track_id) {
+            if (! $this->playTrackAt(
+                $this->room->now_playing_track_id,
+                $this->room->now_playing_name ?? 'Unknown track',
+                $this->room->now_playing_artist ?? '',
+                $this->room->now_playing_album_art_url,
+                $this->room->now_playing_duration_ms ?? 0,
+                $this->room->now_playing_position_ms,
+                $this->room->now_playing_queue_item_id
+            )) {
                 return;
             }
 
-            if (! $this->playItemAt($item, $this->room->now_playing_position_ms)) {
-                return;
-            }
-
-            $this->logActivity('played', "Playback resumed: \"{$item->name}\".");
+            $this->logActivity('played', "Playback resumed: \"{$this->room->now_playing_name}\".");
             $this->broadcastUpdate('playback');
 
             return;
@@ -622,7 +651,10 @@ class ShowRoom extends Component
         }
 
         if ($this->room->fallback_playlist_uri) {
-            $this->startFallbackPlayback();
+            if ($this->startFallbackPlayback()) {
+                $this->syncWithSpotify();
+            }
+
             $this->broadcastUpdate('playback');
         }
     }
@@ -699,7 +731,7 @@ class ShowRoom extends Component
             return;
         }
 
-        if (! $this->room->now_playing_queue_item_id && ! $this->room->is_playing_fallback) {
+        if (! $this->room->now_playing_track_id) {
             return;
         }
 
@@ -1027,19 +1059,36 @@ class ShowRoom extends Component
      * drops often enough that resuming this way was unreliable. Re-issuing
      * the exact track at its stored position works the same for the
      * listener but doesn't depend on Spotify remembering anything.
+     *
+     * Takes track details directly rather than a QueueItem, since "now
+     * playing" isn't necessarily backed by one (a shuffled playlist track,
+     * for instance) — the room's own now_playing_* fields are always the
+     * source of truth for what's currently playing.
      */
-    private function playItemAt(QueueItem $item, int $positionMs): bool
-    {
+    private function playTrackAt(
+        string $spotifyTrackId,
+        string $name,
+        string $artist,
+        ?string $albumArtUrl,
+        int $durationMs,
+        int $positionMs,
+        ?int $queueItemId = null
+    ): bool {
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
-        if (! $client->playTrack('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId(), $positionMs)) {
+        if (! $client->playTrack('spotify:track:'.$spotifyTrackId, $this->providerDeviceId(), $positionMs)) {
             $this->controlError = "Spotify couldn't start playback — try reselecting the device in Host Hub.";
 
             return false;
         }
 
         $this->room->update([
-            'now_playing_queue_item_id' => $item->id,
+            'now_playing_queue_item_id' => $queueItemId,
+            'now_playing_track_id' => $spotifyTrackId,
+            'now_playing_name' => $name,
+            'now_playing_artist' => $artist,
+            'now_playing_album_art_url' => $albumArtUrl,
+            'now_playing_duration_ms' => $durationMs,
             'now_playing_started_at' => now()->subMilliseconds($positionMs),
             'now_playing_position_ms' => $positionMs,
             'is_playing' => true,
@@ -1051,7 +1100,7 @@ class ShowRoom extends Component
 
     private function startPlayback(QueueItem $item): bool
     {
-        if (! $this->playItemAt($item, 0)) {
+        if (! $this->playTrackAt($item->spotify_track_id, $item->name, $item->artist, $item->album_art_url, $item->duration_ms, 0, $item->id)) {
             return false;
         }
 
@@ -1077,6 +1126,11 @@ class ShowRoom extends Component
 
         $this->room->update([
             'now_playing_queue_item_id' => null,
+            'now_playing_track_id' => null,
+            'now_playing_name' => null,
+            'now_playing_artist' => null,
+            'now_playing_album_art_url' => null,
+            'now_playing_duration_ms' => null,
             'now_playing_started_at' => now(),
             'now_playing_position_ms' => 0,
             'is_playing' => true,

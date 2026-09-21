@@ -97,7 +97,7 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ $item->name }}</p>
-                            <p class="truncate text-xs text-aux-faint">{{ $item->artist }} &middot; added by {{ $item->addedBy?->display_name ?? 'Unknown' }}</p>
+                            <p class="truncate text-xs text-aux-faint">{{ $item->artist }}{{ $item->added_by_name ? ' · added by '.$item->added_by_name : '' }}</p>
                         </div>
                         <span class="shrink-0 text-xs text-aux-faint">{{ gmdate('i:s', intdiv($item->duration_ms, 1000)) }}</span>
                     </li>

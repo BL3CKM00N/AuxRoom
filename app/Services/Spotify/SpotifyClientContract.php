@@ -55,6 +55,16 @@ interface SpotifyClientContract
     public function skipToPrevious(?string $deviceId = null): bool;
 
     /**
+     * Spotify's own live upcoming queue — the authoritative "what's next",
+     * covering both natively-queued tracks and upcoming shuffled tracks
+     * from whatever context (playlist) is currently playing. This is what
+     * "Up Next" displays — never reconstructed locally.
+     *
+     * @return array<int, array{id: string, uri: string, name: string, artist: string, album_art_url: ?string, duration_ms: int}>
+     */
+    public function getQueue(): array;
+
+    /**
      * The real, current playback state as Spotify sees it right now — used
      * to detect changes made outside AuxRoom (pausing/seeking from the
      * Spotify app itself, switching to a different track on another

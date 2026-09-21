@@ -27,6 +27,11 @@ class Room extends Model
         'location_enforced',
         'closed_at',
         'now_playing_queue_item_id',
+        'now_playing_track_id',
+        'now_playing_name',
+        'now_playing_artist',
+        'now_playing_album_art_url',
+        'now_playing_duration_ms',
         'now_playing_started_at',
         'now_playing_position_ms',
         'is_playing',
@@ -104,6 +109,26 @@ class Room extends Model
     public function nowPlaying(): BelongsTo
     {
         return $this->belongsTo(QueueItem::class, 'now_playing_queue_item_id');
+    }
+
+    /**
+     * The currently-playing track's details, straight from Spotify's live
+     * state (see ShowRoom::syncWithSpotify()) — not backed by a QueueItem,
+     * since what's playing isn't always something that was queued (a
+     * shuffled playlist track, for instance).
+     */
+    public function nowPlayingDetails(): ?object
+    {
+        if (! $this->now_playing_track_id) {
+            return null;
+        }
+
+        return (object) [
+            'name' => $this->now_playing_name,
+            'artist' => $this->now_playing_artist,
+            'album_art_url' => $this->now_playing_album_art_url,
+            'duration_ms' => $this->now_playing_duration_ms,
+        ];
     }
 
     /**

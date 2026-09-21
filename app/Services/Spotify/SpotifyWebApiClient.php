@@ -196,6 +196,31 @@ class SpotifyWebApiClient implements SpotifyClientContract
         return $response->successful();
     }
 
+    public function getQueue(): array
+    {
+        $response = $this->http()->get('https://api.spotify.com/v1/me/player/queue');
+
+        if ($response->failed()) {
+            Log::warning('Spotify queue fetch failed', ['status' => $response->status(), 'body' => $response->body()]);
+
+            return [];
+        }
+
+        return collect($response->json('queue', []))
+            ->filter()
+            ->filter(fn (array $track) => ($track['type'] ?? 'track') === 'track')
+            ->map(fn (array $track) => [
+                'id' => $track['id'] ?? null,
+                'uri' => $track['uri'] ?? null,
+                'name' => $track['name'] ?? 'Unknown track',
+                'artist' => collect($track['artists'] ?? [])->pluck('name')->join(', '),
+                'album_art_url' => $track['album']['images'][0]['url'] ?? null,
+                'duration_ms' => (int) ($track['duration_ms'] ?? 0),
+            ])
+            ->values()
+            ->all();
+    }
+
     public function getPlaybackState(): ?array
     {
         $response = $this->http()->get('https://api.spotify.com/v1/me/player');

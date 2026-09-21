@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Dashboard;
 
-use App\Models\QueueItem;
 use App\Models\Room;
+use App\Services\Spotify\SpotifyClientFactory;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -29,9 +29,9 @@ class PartyScreen extends Component
         $this->room->refresh();
     }
 
-    public function getNowPlayingProperty(): ?QueueItem
+    public function getNowPlayingProperty(): ?object
     {
-        return $this->room->nowPlaying;
+        return $this->room->nowPlayingDetails();
     }
 
     public function getCurrentPositionMsProperty(): int
@@ -44,9 +44,16 @@ class PartyScreen extends Component
         return $this->room->activeMembers()->count();
     }
 
+    /** Spotify's own live queue — see ShowRoom::getQueueProperty() for why. */
     public function getUpNextProperty()
     {
-        return $this->room->pendingQueueItems()->limit(4)->get();
+        if (app(SpotifyClientFactory::class)->isMock($this->room) || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
+            return collect();
+        }
+
+        return collect(app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue())
+            ->take(4)
+            ->map(fn (array $track) => (object) $track);
     }
 
     public function render()
