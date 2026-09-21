@@ -52,7 +52,7 @@
                             </button>
                             @if ($room->is_playing)
                                 <button wire:click="pause" @disabled(! $this->canGuest('guests_can_play_pause'))
-                                        class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/10 text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed">
+                                        class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
                                     <x-icon name="pause" class="w-3.5 h-3.5" /> Pause
                                 </button>
                             @else
@@ -62,8 +62,8 @@
                                 </button>
                             @endif
                             <button wire:click="skip" @disabled(! $this->canGuest('guests_can_skip'))
-                                    class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
-                                <x-icon name="skip" class="w-3.5 h-3.5" /> Skip track
+                                    class="inline-flex items-center gap-1 text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
+                                <x-icon name="skip" class="w-4 h-4" /> Skip track
                             </button>
                             <button wire:click="toggleRepeat" @disabled(! $this->canGuest('guests_can_play_pause'))
                                     class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->repeat_mode !== 'off' ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
