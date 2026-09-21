@@ -31,15 +31,15 @@
                         <div class="hidden lg:flex items-center space-x-8 sm:ms-10">
                             <button wire:click="setTab('queue')"
                                     class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium {{ $activeTab === 'queue' ? 'border-aux-accent text-aux-text' : 'border-transparent text-aux-muted hover:text-aux-text hover:border-aux-border' }}">
-                                Collaborative Queue
+                                Now Playing
                             </button>
                             <button wire:click="setTab('guests')"
                                     class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium {{ $activeTab === 'guests' ? 'border-aux-accent text-aux-text' : 'border-transparent text-aux-muted hover:text-aux-text hover:border-aux-border' }}">
-                                Guest Portal
+                                Guests
                             </button>
                             <a href="{{ route('rooms.party', $room) }}" target="_blank"
                                class="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-aux-muted hover:text-aux-text hover:border-aux-border">
-                                Party Display
+                                Party Screen
                             </a>
                         </div>
                     </div>
@@ -53,7 +53,7 @@
 
             {{-- Mobile tab strip --}}
             <div class="flex lg:hidden items-center gap-1 px-3 py-2 border-t border-aux-border overflow-x-auto text-xs">
-                <button wire:key="m-nav-queue" wire:click="setTab('queue')" class="shrink-0 px-3 py-1.5 rounded-full {{ $activeTab === 'queue' ? 'bg-aux-card-hover text-aux-accent' : 'text-aux-muted' }}">Queue</button>
+                <button wire:key="m-nav-queue" wire:click="setTab('queue')" class="shrink-0 px-3 py-1.5 rounded-full {{ $activeTab === 'queue' ? 'bg-aux-card-hover text-aux-accent' : 'text-aux-muted' }}">Now Playing</button>
                 <button wire:key="m-nav-guests" wire:click="setTab('guests')" class="shrink-0 px-3 py-1.5 rounded-full {{ $activeTab === 'guests' ? 'bg-aux-card-hover text-aux-accent' : 'text-aux-muted' }}">Guests</button>
                 <a wire:key="m-nav-party" href="{{ route('rooms.party', $room) }}" target="_blank" class="shrink-0 px-3 py-1.5 rounded-full text-aux-muted">Party</a>
                 <button wire:key="m-nav-leave" wire:click="leaveRoom" class="shrink-0 px-3 py-1.5 rounded-full text-aux-muted">Leave</button>

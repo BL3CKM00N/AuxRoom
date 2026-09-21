@@ -22,8 +22,8 @@
                 <h3 class="mt-4 text-lg font-semibold text-aux-text">Connect your Spotify account</h3>
                 <p class="mt-2 text-sm text-aux-muted max-w-sm mx-auto">
                     Connect your own Spotify Developer app so your room can play real music
-                    and control a real device. You can skip this and set it up later from the
-                    Host Hub. The room will run in demo mode until then.
+                    and control a real device. You can skip this and set it up later from
+                    Room Settings. The room will run in demo mode until then.
                 </p>
 
                 <div class="mt-6 max-w-sm mx-auto text-left">

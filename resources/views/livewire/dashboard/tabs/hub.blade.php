@@ -1,4 +1,4 @@
-{{-- Host Hub --}}
+{{-- Room Settings --}}
 <div class="p-5 rounded-xl bg-aux-card border border-aux-border flex flex-wrap items-center justify-between gap-4">
     <div class="flex items-center gap-4">
         <span class="w-12 h-12 rounded-full bg-aux-accent-soft text-aux-accent flex items-center justify-center shrink-0">
@@ -148,7 +148,7 @@
         <p class="text-xs text-aux-faint mt-1">Choose what each guest can do</p>
         <p class="text-xs text-aux-faint">Play, pause, skip, seek, volume, add songs. Per guest, plus the emergency stop.</p>
         <span class="mt-3 inline-flex text-xs font-medium text-aux-accent items-center gap-1">
-            Open Guest Portal <x-icon name="chevron-right" class="w-3 h-3" />
+            Open Guests <x-icon name="chevron-right" class="w-3 h-3" />
         </span>
     </button>
 

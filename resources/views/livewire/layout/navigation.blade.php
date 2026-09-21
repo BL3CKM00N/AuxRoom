@@ -40,21 +40,21 @@ new class extends Component
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     @if ($hostedRoom)
                         <x-nav-link :href="route('dashboard', ['tab' => 'hub'])" :active="request()->routeIs('dashboard') && request()->query('tab', 'hub') === 'hub'" wire:navigate>
-                            Host Hub
+                            Room Settings
                         </x-nav-link>
                         <x-nav-link :href="route('dashboard', ['tab' => 'queue'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'queue'" wire:navigate>
-                            Collaborative Queue
+                            Now Playing
                         </x-nav-link>
                         <x-nav-link :href="route('dashboard', ['tab' => 'guests'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'guests'" wire:navigate>
                             <span class="inline-flex items-center gap-1.5">
-                                Guest Portal
+                                Guests
                                 @if ($hostedRoom->pendingMembers()->count() > 0)
                                     <span class="w-5 h-5 rounded-full bg-aux-accent text-black text-[10px] font-bold flex items-center justify-center">{{ $hostedRoom->pendingMembers()->count() }}</span>
                                 @endif
                             </span>
                         </x-nav-link>
                         <x-nav-link :href="route('rooms.party', $hostedRoom)" target="_blank">
-                            Party Display
+                            Party Screen
                         </x-nav-link>
                     @else
                         <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard') || request()->routeIs('rooms.*')" wire:navigate>
@@ -111,19 +111,19 @@ new class extends Component
         <div class="pt-2 pb-3 space-y-1">
             @if ($hostedRoom)
                 <x-responsive-nav-link :href="route('dashboard', ['tab' => 'hub'])" :active="request()->routeIs('dashboard') && request()->query('tab', 'hub') === 'hub'" wire:navigate>
-                    Host Hub
+                    Room Settings
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('dashboard', ['tab' => 'queue'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'queue'" wire:navigate>
-                    Collaborative Queue
+                    Now Playing
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('dashboard', ['tab' => 'guests'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'guests'" wire:navigate>
-                    Guest Portal
+                    Guests
                     @if ($hostedRoom->pendingMembers()->count() > 0)
                         <span class="ml-1 inline-flex w-4 h-4 rounded-full bg-aux-accent text-black text-[9px] font-bold items-center justify-center">{{ $hostedRoom->pendingMembers()->count() }}</span>
                     @endif
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('rooms.party', $hostedRoom)" target="_blank">
-                    Party Display
+                    Party Screen
                 </x-responsive-nav-link>
             @else
                 <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard') || request()->routeIs('rooms.*')" wire:navigate>

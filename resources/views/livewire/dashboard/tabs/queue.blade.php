@@ -1,4 +1,4 @@
-{{-- Collaborative Queue --}}
+{{-- Now Playing --}}
 <div class="grid gap-6 lg:grid-cols-3">
     <div class="lg:col-span-2 space-y-6">
 
@@ -169,7 +169,7 @@
 
             @if ($this->isMock)
                 <p class="mt-3 text-sm text-aux-faint">
-                    {{ $this->isHost ? 'Connect Spotify in Host Hub to search for real songs.' : "The host hasn't connected Spotify yet. Song search isn't available." }}
+                    {{ $this->isHost ? 'Connect Spotify in Room Settings to search for real songs.' : "The host hasn't connected Spotify yet. Song search isn't available." }}
                 </p>
             @elseif ($outOfRange)
                 <p class="mt-3 text-sm text-amber-400">You're outside the room's range. Move closer to add songs.</p>
@@ -239,7 +239,7 @@
                 <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify.</p>
                 <p class="mt-3 text-sm text-aux-faint">
-                    {{ $this->isHost ? 'Connect Spotify in Host Hub to play a playlist.' : "The host hasn't connected Spotify yet. Playlists aren't available." }}
+                    {{ $this->isHost ? 'Connect Spotify in Room Settings to play a playlist.' : "The host hasn't connected Spotify yet. Playlists aren't available." }}
                 </p>
             </div>
         @elseif ($this->canGuest('guests_can_manage_playlist'))

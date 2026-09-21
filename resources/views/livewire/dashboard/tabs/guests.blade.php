@@ -1,6 +1,6 @@
-{{-- Guest Portal --}}
+{{-- Guests --}}
 <div>
-    <p class="text-xs font-semibold uppercase tracking-widest text-aux-accent">Guest Portal</p>
+    <p class="text-xs font-semibold uppercase tracking-widest text-aux-accent">Guests</p>
     <h1 class="text-2xl sm:text-3xl font-bold mt-1">Your room. Your people.</h1>
     <p class="mt-2 text-sm text-aux-muted max-w-lg">
         Everyone with an invite can join. Controls stay within your room's location boundary.
