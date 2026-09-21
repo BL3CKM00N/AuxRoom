@@ -52,7 +52,7 @@ input[type='range']:disabled {
    their own explicit height regardless of the input's box size. */
 input[type='range'].seek-bar {
     box-sizing: content-box;
-    padding: 10px 0;
+    padding: 2px 0;
     background-clip: content-box;
 }
 
