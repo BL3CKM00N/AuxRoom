@@ -25,6 +25,8 @@ class ShowRoom extends Component
     /** @var array<int, array> */
     public array $searchResults = [];
 
+    public bool $showPlaylistPicker = false;
+
     public string $playlistQuery = '';
 
     /** @var array<int, array> */
@@ -526,6 +528,24 @@ class ShowRoom extends Component
         $this->searchResults = [];
     }
 
+    /** Opens the playlist picker popup, pre-loaded with the host's own playlists. */
+    public function openPlaylistPicker(): void
+    {
+        if (! $this->passesGate('guests_can_manage_playlist')) {
+            return;
+        }
+
+        $this->showPlaylistPicker = true;
+        $this->browseMyPlaylists();
+    }
+
+    public function closePlaylistPicker(): void
+    {
+        $this->showPlaylistPicker = false;
+        $this->playlistQuery = '';
+        $this->playlistResults = [];
+    }
+
     public function updatedPlaylistQuery(): void
     {
         $this->searchPlaylists();
@@ -598,8 +618,7 @@ class ShowRoom extends Component
             return;
         }
 
-        $this->playlistQuery = '';
-        $this->playlistResults = [];
+        $this->closePlaylistPicker();
 
         // Learn the actual track Spotify picked to start with right away,
         // instead of waiting up to 3s for the next heartbeat poll.

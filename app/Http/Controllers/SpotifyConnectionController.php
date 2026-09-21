@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 
 class SpotifyConnectionController extends Controller
 {
-    private const SCOPES = 'user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing';
+    private const SCOPES = 'user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative';
 
     /**
      * Store the user's own Spotify Developer app credentials, then kick off

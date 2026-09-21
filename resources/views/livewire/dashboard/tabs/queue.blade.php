@@ -258,42 +258,10 @@
                 <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify. Added songs play next without interrupting it.</p>
 
-                <div class="mt-3 relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-aux-faint">
-                        <x-icon name="search" class="w-4 h-4" />
-                    </span>
-                    <input type="text" wire:model.live.debounce.400ms="playlistQuery"
-                           placeholder="Paste a playlist link or search…"
-                           class="w-full pl-9 pr-3 py-2 rounded-full bg-aux-card-hover border border-aux-border text-sm placeholder:text-aux-faint focus:outline-none focus:ring-1 focus:ring-aux-accent">
-                </div>
-
-                <button type="button" wire:click="browseMyPlaylists" class="mt-2 text-xs font-medium text-aux-accent inline-flex items-center gap-1">
-                    Browse my playlists <x-icon name="chevron-right" class="w-3 h-3" />
+                <button type="button" wire:click="openPlaylistPicker"
+                        class="mt-3 w-full py-2.5 rounded-full bg-aux-card-hover text-sm font-medium hover:bg-white/10 inline-flex items-center justify-center gap-1.5">
+                    <x-icon name="queue-list" class="w-4 h-4" /> Choose a playlist
                 </button>
-
-                @if (! empty($playlistResults))
-                    <ul class="mt-3 space-y-1 max-h-56 overflow-y-auto">
-                        @foreach ($playlistResults as $i => $p)
-                            <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5">
-                                <div class="w-9 h-9 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
-                                    @if ($p['image_url'])
-                                        <img src="{{ $p['image_url'] }}" class="w-full h-full object-cover" alt="">
-                                    @else
-                                        <x-icon name="queue-list" class="w-4 h-4 text-aux-faint" />
-                                    @endif
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="truncate text-sm font-medium">{{ $p['name'] }}</p>
-                                    <p class="truncate text-xs text-aux-faint">{{ $p['owner'] }}{{ $p['track_count'] !== null ? ' · '.$p['track_count'].' tracks' : '' }}</p>
-                                </div>
-                                <button wire:click="playPlaylist({{ $i }})"
-                                        class="shrink-0 px-2.5 py-1 rounded-full bg-aux-accent text-black text-xs font-semibold">
-                                    Play
-                                </button>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
             </div>
         @endif
 
