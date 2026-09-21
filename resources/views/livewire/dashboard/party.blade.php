@@ -24,8 +24,17 @@
                 {{ $room->is_playing ? 'PLAYING' : 'PAUSED' }}
             </span>
 
-            <div class="mt-6 w-full max-w-sm h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <div class="h-full bg-aux-accent" style="width: {{ $this->nowPlaying->duration_ms > 0 ? min(100, ($this->currentPositionMs / $this->nowPlaying->duration_ms) * 100) : 0 }}%"></div>
+            <div class="mt-6 w-full max-w-sm"
+                 x-data="playbackClock()"
+                 x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                 x-on:playback-sync.window="sync($event.detail)">
+                <div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div class="h-full bg-aux-accent" :style="`width: ${seekPct}%`"></div>
+                </div>
+                <div class="mt-2 flex justify-between text-[11px] text-aux-faint">
+                    <span x-text="formatMs(positionMs)"></span>
+                    <span x-text="formatMs(durationMs)"></span>
+                </div>
             </div>
         @endif
 

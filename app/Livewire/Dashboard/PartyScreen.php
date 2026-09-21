@@ -61,6 +61,12 @@ class PartyScreen extends Component
 
     public function render()
     {
+        $this->dispatch('playback-sync',
+            positionMs: $this->currentPositionMs,
+            durationMs: $this->nowPlaying?->duration_ms ?? 0,
+            isPlaying: $this->room->is_playing,
+        );
+
         return view('livewire.dashboard.party')
             ->layout('layouts.room', ['title' => $this->room->name.' · Party screen']);
     }

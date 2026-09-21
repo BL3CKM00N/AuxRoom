@@ -194,10 +194,12 @@
                 <span class="flex items-center text-aux-faint opacity-40"><x-icon name="device" class="w-4 h-4" /></span>
             @endif
             <x-icon name="volume" class="w-4 h-4 {{ $this->canGuest('guests_can_set_volume') ? 'text-aux-muted' : 'text-aux-faint opacity-40' }}" />
-            <input type="range" min="0" max="100" value="{{ $room->volume_percent }}" @disabled(! $this->canGuest('guests_can_set_volume'))
-                   style="background: linear-gradient(to right, #22c55e {{ $room->volume_percent }}%, rgba(255,255,255,0.12) {{ $room->volume_percent }}%)"
-                   oninput="this.style.background = `linear-gradient(to right, #22c55e ${this.value}%, rgba(255,255,255,0.12) ${this.value}%)`"
-                   wire:change="setVolume($event.target.value)" class="w-20 disabled:opacity-30">
+            <div x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume">
+                <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume'))
+                       :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%)`"
+                       x-on:input="volume = $event.target.valueAsNumber"
+                       wire:change="setVolume($event.target.value)" class="w-20 disabled:opacity-30">
+            </div>
         </div>
     </div>
 

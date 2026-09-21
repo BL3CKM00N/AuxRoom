@@ -1353,6 +1353,7 @@ class ShowRoom extends Component
             positionMs: $this->currentPositionMs,
             durationMs: $this->nowPlaying?->duration_ms ?? 0,
             isPlaying: $this->room->is_playing,
+            volumePercent: $this->room->volume_percent,
         );
 
         $view = view('livewire.dashboard.show');
