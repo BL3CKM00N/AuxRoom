@@ -1,9 +1,19 @@
 <div wire:poll.5s="poll"
      x-data="{
+        isTouch: matchMedia('(pointer: coarse)').matches,
         controlsVisible: true,
         isFullscreen: false,
+        showQrPopup: false,
         hideTimer: null,
         resetIdleTimer() {
+            // Touch devices have no cursor to mimic and no incidental
+            // movement to bring hidden controls back — auto-hiding them
+            // there just makes the buttons disappear with no obvious way
+            // to get them back, so leave them visible permanently.
+            if (this.isTouch) {
+                return;
+            }
+
             this.controlsVisible = true;
             clearTimeout(this.hideTimer);
             this.hideTimer = setTimeout(() => { this.controlsVisible = false; }, 5000);
@@ -34,6 +44,14 @@
         <button onclick="window.close()" class="text-aux-faint hover:text-aux-text">
             <x-icon name="x-mark" class="w-6 h-6" />
         </button>
+    </div>
+
+    {{-- Listener count moves to the opposite corner on mobile, where the
+         QR/invite block is a popup trigger instead of sitting inline. --}}
+    <div class="sm:hidden absolute top-6 left-6 z-10">
+        <span class="inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
+            <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
+        </span>
     </div>
 
     <div class="flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
@@ -100,17 +118,43 @@
                 </div>
             </div>
         @endif
+
+        {{-- Mobile: a compact button that opens the QR as a popup, instead
+             of a permanent block competing with the centered content for
+             limited vertical space. --}}
+        <button type="button" x-on:click="showQrPopup = true"
+                class="sm:hidden mt-10 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-aux-card border border-aux-border text-sm font-medium">
+            <x-icon name="qr" class="w-4 h-4 text-aux-accent" /> Join the aux
+        </button>
+
+        {{-- Larger screens: small always-visible QR + code in the corner,
+             with room to sit there without colliding with anything. --}}
+        <div class="hidden sm:flex sm:absolute sm:bottom-6 sm:right-6 items-end justify-end gap-3">
+            <span class="mb-1 inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
+                <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
+            </span>
+            <div class="w-[100px] text-center">
+                <div class="p-2 bg-white rounded-lg">
+                    {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(84)->generate(route('join', ['code' => $room->invite_code])) !!}
+                </div>
+                <p class="mt-1 text-[11px] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
+            </div>
+        </div>
     </div>
 
-    <div class="absolute bottom-6 right-6 flex items-end gap-3">
-        <span class="mb-1 inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
-            <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
-        </span>
-        <div class="w-[100px] text-center">
-            <div class="p-2 bg-white rounded-lg">
-                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(84)->generate(route('join', ['code' => $room->invite_code])) !!}
+    {{-- Mobile QR popup --}}
+    <div x-show="showQrPopup" x-cloak class="fixed inset-0 z-40 flex items-center justify-center px-6">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" x-on:click="showQrPopup = false"></div>
+        <div class="relative w-full max-w-xs bg-aux-card border border-aux-border rounded-xl p-6 text-center">
+            <button x-on:click="showQrPopup = false" class="absolute top-4 right-4 text-aux-faint hover:text-aux-text">
+                <x-icon name="x-mark" class="w-5 h-5" />
+            </button>
+            <p class="text-xs font-semibold uppercase tracking-widest text-aux-accent">Join the aux</p>
+            <div class="mt-4 p-4 bg-white rounded-xl inline-block">
+                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(180)->generate(route('join', ['code' => $room->invite_code])) !!}
             </div>
-            <p class="mt-1 text-[11px] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
+            <p class="mt-4 text-2xl font-bold tracking-wide">{{ $room->invite_code }}</p>
+            <p class="mt-2 text-xs text-aux-faint">Scan to open AuxRoom on your phone.</p>
         </div>
     </div>
 </div>
