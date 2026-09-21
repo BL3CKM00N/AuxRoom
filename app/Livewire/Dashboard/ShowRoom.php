@@ -197,15 +197,16 @@ class ShowRoom extends Component
             return;
         }
 
-        // Only reconcile a session AuxRoom itself started — otherwise the
-        // host's unrelated personal Spotify listening would leak into the room.
-        if (! $this->room->now_playing_queue_item_id && ! $this->room->is_playing_fallback) {
-            return;
-        }
-
         $state = app(SpotifyClientFactory::class)->forRoom($this->room)->getPlaybackState();
 
         if (! $state) {
+            // Nothing playing anywhere on the account at all (not even
+            // paused) — reflect that if the room still thought otherwise.
+            if ($this->room->is_playing) {
+                $this->room->update(['is_playing' => false]);
+                $this->broadcastUpdate('playback');
+            }
+
             return;
         }
 
@@ -224,6 +225,11 @@ class ShowRoom extends Component
                     ->update(['played_at' => now()]);
 
                 $this->room->update(['now_playing_queue_item_id' => $matched->id]);
+            } elseif (! $this->room->is_playing_fallback) {
+                // Playing something outside our queue and the fallback
+                // playlist (started directly from Spotify) — don't keep
+                // showing whatever track we last knew about.
+                $this->room->update(['now_playing_queue_item_id' => null]);
             }
         }
 
@@ -539,20 +545,16 @@ class ShowRoom extends Component
 
         if ($this->room->now_playing_queue_item_id && ! $this->room->is_playing) {
             $item = $this->room->nowPlaying;
-            $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
-            if (! $client->resume($this->providerDeviceId())) {
-                $this->controlError = "Spotify couldn't resume playback — try reselecting the device in Host Hub.";
-
+            if (! $item) {
                 return;
             }
 
-            $this->room->update([
-                'is_playing' => true,
-                'now_playing_started_at' => now()->subMilliseconds($this->room->now_playing_position_ms),
-            ]);
+            if (! $this->playItemAt($item, $this->room->now_playing_position_ms)) {
+                return;
+            }
 
-            $this->logActivity('played', "Playback resumed: \"{$item?->name}\".");
+            $this->logActivity('played', "Playback resumed: \"{$item->name}\".");
             $this->broadcastUpdate('playback');
 
             return;
@@ -939,11 +941,18 @@ class ShowRoom extends Component
         return $account->active_device_id;
     }
 
-    private function startPlayback(QueueItem $item): bool
+    /**
+     * Spotify's bare "resume" (an empty-body PUT to /player/play) relies on
+     * its backend still remembering the paused context, which it silently
+     * drops often enough that resuming this way was unreliable. Re-issuing
+     * the exact track at its stored position works the same for the
+     * listener but doesn't depend on Spotify remembering anything.
+     */
+    private function playItemAt(QueueItem $item, int $positionMs): bool
     {
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
-        if (! $client->playTrack('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId())) {
+        if (! $client->playTrack('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId(), $positionMs)) {
             $this->controlError = "Spotify couldn't start playback — try reselecting the device in Host Hub.";
 
             return false;
@@ -951,11 +960,20 @@ class ShowRoom extends Component
 
         $this->room->update([
             'now_playing_queue_item_id' => $item->id,
-            'now_playing_started_at' => now(),
-            'now_playing_position_ms' => 0,
+            'now_playing_started_at' => now()->subMilliseconds($positionMs),
+            'now_playing_position_ms' => $positionMs,
             'is_playing' => true,
             'is_playing_fallback' => false,
         ]);
+
+        return true;
+    }
+
+    private function startPlayback(QueueItem $item): bool
+    {
+        if (! $this->playItemAt($item, 0)) {
+            return false;
+        }
 
         $this->logActivity('played', "Now playing: \"{$item->name}\" by {$item->artist}.");
 

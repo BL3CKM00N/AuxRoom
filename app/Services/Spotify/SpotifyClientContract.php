@@ -16,8 +16,6 @@ interface SpotifyClientContract
 
     public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool;
 
-    public function resume(?string $deviceId): bool;
-
     public function pause(?string $deviceId = null): bool;
 
     public function seek(int $positionMs, ?string $deviceId = null): bool;

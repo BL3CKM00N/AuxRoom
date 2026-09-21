@@ -65,13 +65,6 @@ class SpotifyWebApiClient implements SpotifyClientContract
         ]);
     }
 
-    public function resume(?string $deviceId): bool
-    {
-        $query = $deviceId ? ['device_id' => $deviceId] : [];
-
-        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, []);
-    }
-
     public function pause(?string $deviceId = null): bool
     {
         $query = $deviceId ? ['device_id' => $deviceId] : [];
