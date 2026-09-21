@@ -1,8 +1,39 @@
-<div wire:poll.5s="poll" class="min-h-screen bg-aux-bg text-aux-text flex flex-col relative">
+<div wire:poll.5s="poll"
+     x-data="{
+        controlsVisible: true,
+        isFullscreen: false,
+        hideTimer: null,
+        resetIdleTimer() {
+            this.controlsVisible = true;
+            clearTimeout(this.hideTimer);
+            this.hideTimer = setTimeout(() => { this.controlsVisible = false; }, 5000);
+        },
+        toggleFullscreen() {
+            if (! document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        },
+     }"
+     x-init="
+        resetIdleTimer();
+        document.addEventListener('fullscreenchange', () => { isFullscreen = !!document.fullscreenElement; });
+     "
+     x-on:mousemove.window="resetIdleTimer()"
+     x-on:touchstart.window="resetIdleTimer()"
+     :class="controlsVisible ? '' : 'cursor-none'"
+     class="min-h-screen bg-aux-bg text-aux-text flex flex-col relative">
 
-    <button onclick="window.close()" class="absolute top-6 right-6 z-10 text-aux-faint hover:text-aux-text">
-        <x-icon name="x-mark" class="w-6 h-6" />
-    </button>
+    <div class="absolute top-6 right-6 z-10 flex items-center gap-4 transition-opacity duration-300"
+         :class="controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'">
+        <button x-on:click="toggleFullscreen()" class="text-aux-faint hover:text-aux-text">
+            <x-icon name="expand" class="w-6 h-6" />
+        </button>
+        <button onclick="window.close()" class="text-aux-faint hover:text-aux-text">
+            <x-icon name="x-mark" class="w-6 h-6" />
+        </button>
+    </div>
 
     <div class="flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
         <div class="w-72 h-72 max-w-full aspect-square rounded-2xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border flex items-center justify-center overflow-hidden shadow-2xl shadow-aux-accent/10">
