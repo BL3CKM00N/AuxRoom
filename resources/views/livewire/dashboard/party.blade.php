@@ -65,11 +65,11 @@
         <span class="mb-1 inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
             <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
         </span>
-        <div class="text-center">
+        <div class="w-[100px] text-center">
             <div class="p-2 bg-white rounded-lg">
                 {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(84)->generate(route('join', ['code' => $room->invite_code])) !!}
             </div>
-            <p class="mt-1 text-[11px] font-semibold tracking-wide text-aux-faint">{{ $room->invite_code }}</p>
+            <p class="mt-1 text-[11px] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
         </div>
     </div>
 </div>
