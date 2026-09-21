@@ -175,16 +175,21 @@ class SpotifyWebApiClient implements SpotifyClientContract
         }
 
         $json = $response->json();
+        $item = $json['item'] ?? null;
 
-        if (! $json || ! ($json['item'] ?? null)) {
+        if (! $json || ! $item) {
             return null;
         }
 
         return [
             'is_playing' => (bool) ($json['is_playing'] ?? false),
             'progress_ms' => (int) ($json['progress_ms'] ?? 0),
-            'track_id' => $json['item']['id'] ?? null,
+            'track_id' => $item['id'] ?? null,
             'device_id' => $json['device']['id'] ?? null,
+            'name' => $item['name'] ?? null,
+            'artist' => collect($item['artists'] ?? [])->pluck('name')->join(', ') ?: null,
+            'album_art_url' => $item['album']['images'][0]['url'] ?? null,
+            'duration_ms' => (int) ($item['duration_ms'] ?? 0),
         ];
     }
 

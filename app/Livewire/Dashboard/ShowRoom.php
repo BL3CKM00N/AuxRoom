@@ -218,19 +218,33 @@ class ShowRoom extends Component
         if ($trackChanged) {
             $matched = $this->room->pendingQueueItems()->where('spotify_track_id', $state['track_id'])->first();
 
-            if ($matched) {
-                $this->room->queueItems()
-                    ->whereNull('played_at')
-                    ->where('position', '<', $matched->position)
-                    ->update(['played_at' => now()]);
-
-                $this->room->update(['now_playing_queue_item_id' => $matched->id]);
-            } elseif (! $this->room->is_playing_fallback) {
+            if (! $matched) {
                 // Playing something outside our queue and the fallback
-                // playlist (started directly from Spotify) — don't keep
-                // showing whatever track we last knew about.
-                $this->room->update(['now_playing_queue_item_id' => null]);
+                // playlist (started directly from Spotify, another device,
+                // etc) — track it like any other item so the room shows
+                // exactly what's actually playing, the same way switching
+                // devices in Spotify itself shows the current track.
+                $matched = $this->room->queueItems()->create([
+                    'added_by_id' => null,
+                    'spotify_track_id' => $state['track_id'],
+                    'name' => $state['name'] ?? 'Unknown track',
+                    'artist' => $state['artist'] ?? '',
+                    'album_art_url' => $state['album_art_url'] ?? null,
+                    'duration_ms' => $state['duration_ms'] ?? 0,
+                    // Sorts ahead of anything already queued, since it's
+                    // what's playing right now, not something upcoming.
+                    'position' => (int) ($this->room->pendingQueueItems()->min('position') ?? 1) - 1,
+                ]);
+
+                $this->logActivity('played', "Now playing from Spotify: \"{$matched->name}\".");
             }
+
+            $this->room->queueItems()
+                ->whereNull('played_at')
+                ->where('position', '<', $matched->position)
+                ->update(['played_at' => now()]);
+
+            $this->room->update(['now_playing_queue_item_id' => $matched->id]);
         }
 
         $drifted = abs($state['progress_ms'] - $this->room->currentPositionMs()) > 3000;
