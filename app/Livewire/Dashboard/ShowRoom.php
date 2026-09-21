@@ -380,7 +380,11 @@ class ShowRoom extends Component
 
         $upcoming = app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue();
 
-        return collect($upcoming)->map(function (array $track) {
+        // With repeat-track on, Spotify's own queue is just the currently
+        // playing track cycling forever — its raw "queue" array reflects
+        // that literally, listing the same track dozens of times. Collapse
+        // to unique tracks so "Up Next" doesn't show one song repeated.
+        return collect($upcoming)->unique('id')->map(function (array $track) {
             $queued = $this->room->queueItems()
                 ->where('spotify_track_id', $track['id'])
                 ->whereNull('played_at')

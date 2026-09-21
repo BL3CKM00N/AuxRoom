@@ -51,7 +51,10 @@ class PartyScreen extends Component
             return collect();
         }
 
+        // Collapse to unique tracks — with repeat-track on, Spotify's raw
+        // queue is just the currently playing track listed many times over.
         return collect(app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue())
+            ->unique('id')
             ->take(4)
             ->map(fn (array $track) => (object) $track);
     }

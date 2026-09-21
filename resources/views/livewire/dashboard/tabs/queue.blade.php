@@ -154,33 +154,6 @@
 
     <div class="space-y-6">
 
-        {{-- Emergency stop: locks queue additions instantly, right above the card it controls --}}
-        @if ($this->isHost)
-            <div class="p-5 rounded-xl bg-red-500/10 border border-red-500/30">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <x-icon name="zap" class="w-4 h-4 text-red-400" />
-                        <h3 class="font-semibold">Emergency stop</h3>
-                    </div>
-                    @unless ($room->guests_can_add_to_queue)
-                        <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">QUEUE LOCKED</span>
-                    @endunless
-                </div>
-                <p class="mt-1 text-xs text-aux-muted">
-                    Instantly stop everyone from adding songs, overriding individual permissions. Use this if something inappropriate gets added.
-                </p>
-                @if ($room->guests_can_add_to_queue)
-                    <button wire:click="emergencyStopQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-400">
-                        Lock the queue now
-                    </button>
-                @else
-                    <button wire:click="reopenQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-900 text-white text-sm font-semibold hover:bg-red-800">
-                        Unlock the queue
-                    </button>
-                @endif
-            </div>
-        @endif
-
         {{-- Find music --}}
         @php
             $outOfRange = ! $this->isHost && $room->location_enforced && ! $this->member->passesLocationCheck();
@@ -274,12 +247,7 @@
             </div>
         @elseif ($this->canGuest('guests_can_manage_playlist'))
             <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
-                <div class="flex items-center justify-between">
-                    <h3 class="font-semibold">Playlist</h3>
-                    @if ($room->is_playing_fallback)
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-aux-accent-soft text-aux-accent">PLAYING</span>
-                    @endif
-                </div>
+                <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify. Added songs play next without interrupting it.</p>
 
                 @if ($room->fallback_playlist_uri)
@@ -293,9 +261,6 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
-                            @if ($room->is_playing_fallback && $this->nowPlaying)
-                                <p class="truncate text-xs text-aux-accent">Now playing: {{ $this->nowPlaying->name }}</p>
-                            @endif
                         </div>
                     </div>
                 @endif
@@ -339,12 +304,7 @@
             </div>
         @elseif ($room->fallback_playlist_uri)
             <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
-                <div class="flex items-center justify-between">
-                    <h3 class="font-semibold">Playlist</h3>
-                    @if ($room->is_playing_fallback)
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-aux-accent-soft text-aux-accent">PLAYING</span>
-                    @endif
-                </div>
+                <h3 class="font-semibold">Playlist</h3>
                 <div class="mt-3 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-md bg-aux-card-hover flex items-center justify-center overflow-hidden shrink-0">
                         @if ($room->fallback_playlist_image_url)
@@ -355,11 +315,35 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
-                        @if ($room->is_playing_fallback && $this->nowPlaying)
-                            <p class="truncate text-xs text-aux-accent">Now playing: {{ $this->nowPlaying->name }}</p>
-                        @endif
                     </div>
                 </div>
+            </div>
+        @endif
+
+        {{-- Emergency stop: locks queue additions instantly --}}
+        @if ($this->isHost)
+            <div class="p-5 rounded-xl bg-red-500/10 border border-red-500/30">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <x-icon name="zap" class="w-4 h-4 text-red-400" />
+                        <h3 class="font-semibold">Emergency stop</h3>
+                    </div>
+                    @unless ($room->guests_can_add_to_queue)
+                        <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">QUEUE LOCKED</span>
+                    @endunless
+                </div>
+                <p class="mt-1 text-xs text-aux-muted">
+                    Instantly stop everyone from adding songs, overriding individual permissions. Use this if something inappropriate gets added.
+                </p>
+                @if ($room->guests_can_add_to_queue)
+                    <button wire:click="emergencyStopQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-400">
+                        Lock the queue now
+                    </button>
+                @else
+                    <button wire:click="reopenQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-900 text-white text-sm font-semibold hover:bg-red-800">
+                        Unlock the queue
+                    </button>
+                @endif
             </div>
         @endif
     </div>
