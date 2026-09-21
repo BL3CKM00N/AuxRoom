@@ -124,12 +124,12 @@
                     Shuffle is on, so Spotify doesn't report the real shuffled order. Upcoming tracks from the playlist can't be shown reliably here, but songs queued above are unaffected.
                 </p>
             @elseif ($playlistItems->isNotEmpty())
-                <p class="mt-5 pt-4 border-t border-aux-border text-[10px] uppercase tracking-widest text-aux-faint">
+                <p class="mt-5 pt-4 border-t border-aux-border text-[10px] uppercase tracking-widest text-aux-text">
                     Coming up from the playlist
                 </p>
                 <ul class="mt-2 divide-y divide-white/5">
                     @foreach ($playlistItems as $item)
-                        <li class="group py-2.5 flex items-center gap-3 {{ $this->canGuest('guests_can_manage_playlist') ? 'cursor-pointer -mx-2 px-2 rounded-lg hover:bg-white/5' : '' }}"
+                        <li class="group py-2.5 flex items-center gap-3 {{ $this->canGuest('guests_can_manage_playlist') ? 'cursor-pointer -mx-2 px-2 rounded-lg hover:bg-white/10' : '' }}"
                             @if ($this->canGuest('guests_can_manage_playlist'))
                                 wire:click="playFromPlaylist('{{ $item->spotify_track_id }}')"
                             @endif>
