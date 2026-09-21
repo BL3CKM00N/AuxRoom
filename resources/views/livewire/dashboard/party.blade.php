@@ -28,7 +28,8 @@
     <div class="absolute top-6 right-6 z-10 flex items-center gap-4 transition-opacity duration-300"
          :class="controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'">
         <button x-on:click="toggleFullscreen()" class="text-aux-faint hover:text-aux-text">
-            <x-icon name="expand" class="w-6 h-6" />
+            <x-icon name="expand" class="w-6 h-6" x-show="! isFullscreen" />
+            <x-icon name="collapse" class="w-6 h-6" x-show="isFullscreen" x-cloak />
         </button>
         <button onclick="window.close()" class="text-aux-faint hover:text-aux-text">
             <x-icon name="x-mark" class="w-6 h-6" />
