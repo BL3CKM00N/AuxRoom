@@ -143,15 +143,19 @@
                 </button>
                 <button disabled class="text-aux-faint opacity-40 cursor-default"><x-icon name="repeat" class="w-4 h-4" /></button>
             </div>
-            <div class="w-full max-w-md flex items-center gap-2 text-[10px] text-aux-faint">
-                <span>{{ gmdate('i:s', intdiv($this->currentPositionMs, 1000)) }}</span>
-                @php $seekPct = $this->nowPlaying && $this->nowPlaying->duration_ms > 0 ? min(100, ($this->currentPositionMs / $this->nowPlaying->duration_ms) * 100) : 0; @endphp
-                <input type="range" min="0" max="{{ $this->nowPlaying->duration_ms ?? 100 }}"
-                       value="{{ $this->currentPositionMs }}" @disabled(! $this->nowPlaying || ! $this->canGuest('guests_can_seek'))
-                       style="background: linear-gradient(to right, #22c55e {{ $seekPct }}%, rgba(255,255,255,0.12) {{ $seekPct }}%)"
-                       oninput="this.style.background = `linear-gradient(to right, #22c55e ${(this.value/this.max)*100}%, rgba(255,255,255,0.12) ${(this.value/this.max)*100}%)`"
+            <div class="w-full max-w-md flex items-center gap-2 text-[10px] text-aux-faint"
+                 x-data="playbackClock()"
+                 x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                 x-on:playback-sync.window="sync($event.detail)">
+                <span x-text="formatMs(positionMs)"></span>
+                <input type="range" min="0" :max="durationMs || 100" :value="positionMs"
+                       @disabled(! $this->nowPlaying || ! $this->canGuest('guests_can_seek'))
+                       @mousedown="dragging = true" @touchstart="dragging = true"
+                       @mouseup="dragging = false" @touchend="dragging = false"
+                       @input="positionMs = Number($event.target.value)"
+                       :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%)`"
                        wire:change="seek($event.target.value)" class="flex-1 disabled:opacity-30">
-                <span>{{ gmdate('i:s', intdiv($this->nowPlaying->duration_ms ?? 0, 1000)) }}</span>
+                <span x-text="formatMs(durationMs)"></span>
             </div>
         </div>
 

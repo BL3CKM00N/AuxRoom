@@ -477,7 +477,12 @@ class ShowRoom extends Component
         if ($this->room->now_playing_queue_item_id && ! $this->room->is_playing) {
             $item = $this->room->nowPlaying;
             $client = app(SpotifyClientFactory::class)->forRoom($this->room);
-            $client->resume($this->providerDeviceId());
+
+            if (! $client->resume($this->providerDeviceId())) {
+                $this->controlError = "Spotify couldn't resume playback — try reselecting the device in Host Hub.";
+
+                return;
+            }
 
             $this->room->update([
                 'is_playing' => true,
@@ -517,7 +522,11 @@ class ShowRoom extends Component
 
         $position = $this->room->currentPositionMs();
 
-        app(SpotifyClientFactory::class)->forRoom($this->room)->pause();
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->pause()) {
+            $this->controlError = "Spotify couldn't pause playback.";
+
+            return;
+        }
 
         $this->room->update([
             'is_playing' => false,
@@ -549,7 +558,11 @@ class ShowRoom extends Component
             return;
         }
 
-        app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms);
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms)) {
+            $this->controlError = "Spotify couldn't seek playback.";
+
+            return;
+        }
 
         $this->room->update([
             'now_playing_position_ms' => $ms,
@@ -567,7 +580,12 @@ class ShowRoom extends Component
 
         $percent = max(0, min(100, $percent));
 
-        app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent);
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent)) {
+            $this->controlError = "Spotify couldn't change the volume.";
+
+            return;
+        }
+
         $this->room->update(['volume_percent' => $percent]);
         $this->broadcastUpdate('playback');
     }
@@ -835,10 +853,15 @@ class ShowRoom extends Component
         return $this->room->playbackProvider?->spotifyAccount?->active_device_id;
     }
 
-    private function startPlayback(QueueItem $item): void
+    private function startPlayback(QueueItem $item): bool
     {
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
-        $client->playTrack('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId());
+
+        if (! $client->playTrack('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId())) {
+            $this->controlError = "Spotify couldn't start playback — try reselecting the device in Host Hub.";
+
+            return false;
+        }
 
         $this->room->update([
             'now_playing_queue_item_id' => $item->id,
@@ -849,6 +872,8 @@ class ShowRoom extends Component
         ]);
 
         $this->logActivity('played', "Now playing: \"{$item->name}\" by {$item->artist}.");
+
+        return true;
     }
 
     /**
@@ -856,10 +881,15 @@ class ShowRoom extends Component
      * playlist. AuxRoom doesn't manage its tracks one by one — Spotify keeps
      * it going on its own until a guest queues something, which interrupts it.
      */
-    private function startFallbackPlayback(): void
+    private function startFallbackPlayback(): bool
     {
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
-        $client->playContext($this->room->fallback_playlist_uri, $this->providerDeviceId(), true);
+
+        if (! $client->playContext($this->room->fallback_playlist_uri, $this->providerDeviceId(), true)) {
+            $this->controlError = "Spotify couldn't start the fallback playlist — try reselecting the device in Host Hub.";
+
+            return false;
+        }
 
         $this->room->update([
             'now_playing_queue_item_id' => null,
@@ -870,6 +900,8 @@ class ShowRoom extends Component
         ]);
 
         $this->logActivity('played', "Fallback playlist started: \"{$this->room->fallback_playlist_name}\".");
+
+        return true;
     }
 
     private function advanceQueue(): void
@@ -971,6 +1003,12 @@ class ShowRoom extends Component
 
     public function render()
     {
+        $this->dispatch('playback-sync',
+            positionMs: $this->currentPositionMs,
+            durationMs: $this->nowPlaying?->duration_ms ?? 0,
+            isPlaying: $this->room->is_playing,
+        );
+
         $view = view('livewire.dashboard.show');
 
         // Hosts get the same app shell (navbar, dropdown, hamburger) as every

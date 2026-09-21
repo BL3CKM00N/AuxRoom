@@ -20,15 +20,19 @@
                     <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Fallback playlist · shuffled' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track')) }}</p>
 
                     @if ($this->nowPlaying)
-                        @php $seekPct = $this->nowPlaying->duration_ms > 0 ? min(100, ($this->currentPositionMs / $this->nowPlaying->duration_ms) * 100) : 0; @endphp
-                        <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint">
-                            <span>{{ gmdate('i:s', intdiv($this->currentPositionMs, 1000)) }}</span>
-                            <input type="range" min="0" max="{{ $this->nowPlaying->duration_ms }}"
-                                   value="{{ $this->currentPositionMs }}" wire:change="seek($event.target.value)"
-                                   style="background: linear-gradient(to right, #22c55e {{ $seekPct }}%, rgba(255,255,255,0.12) {{ $seekPct }}%)"
-                                   oninput="this.style.background = `linear-gradient(to right, #22c55e ${(this.value/this.max)*100}%, rgba(255,255,255,0.12) ${(this.value/this.max)*100}%)`"
+                        <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint"
+                             x-data="playbackClock()"
+                             x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                             x-on:playback-sync.window="sync($event.detail)">
+                            <span x-text="formatMs(positionMs)"></span>
+                            <input type="range" min="0" :max="durationMs || 100" :value="positionMs"
+                                   wire:change="seek($event.target.value)"
+                                   @mousedown="dragging = true" @touchstart="dragging = true"
+                                   @mouseup="dragging = false" @touchend="dragging = false"
+                                   @input="positionMs = Number($event.target.value)"
+                                   :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%)`"
                                    @disabled(! $this->canGuest('guests_can_seek')) class="flex-1 disabled:opacity-30">
-                            <span>{{ gmdate('i:s', intdiv($this->nowPlaying->duration_ms, 1000)) }}</span>
+                            <span x-text="formatMs(durationMs)"></span>
                         </div>
 
                         <div class="mt-3 flex items-center gap-3">
