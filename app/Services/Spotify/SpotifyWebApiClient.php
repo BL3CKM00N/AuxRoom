@@ -146,6 +146,28 @@ class SpotifyWebApiClient implements SpotifyClientContract
         ]);
     }
 
+    public function getPlaybackState(): ?array
+    {
+        $response = $this->http()->get('https://api.spotify.com/v1/me/player');
+
+        if ($response->status() === 204 || $response->failed()) {
+            return null;
+        }
+
+        $json = $response->json();
+
+        if (! $json || ! ($json['item'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'is_playing' => (bool) ($json['is_playing'] ?? false),
+            'progress_ms' => (int) ($json['progress_ms'] ?? 0),
+            'track_id' => $json['item']['id'] ?? null,
+            'device_id' => $json['device']['id'] ?? null,
+        ];
+    }
+
     /**
      * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}>
      */

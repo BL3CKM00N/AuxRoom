@@ -40,4 +40,13 @@ interface SpotifyClientContract
     public function getPlaylist(string $id): ?array;
 
     public function playContext(string $contextUri, ?string $deviceId, bool $shuffle = true): bool;
+
+    /**
+     * The real, current playback state as Spotify sees it right now — used
+     * to detect changes made outside AuxRoom (pausing/seeking from the
+     * Spotify app itself, another Spotify Connect client, etc).
+     *
+     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string}|null
+     */
+    public function getPlaybackState(): ?array;
 }

@@ -68,4 +68,9 @@ class MockSpotifyClient implements SpotifyClientContract
     {
         return true;
     }
+
+    public function getPlaybackState(): ?array
+    {
+        return null;
+    }
 }

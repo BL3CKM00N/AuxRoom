@@ -177,7 +177,70 @@ class ShowRoom extends Component
         $this->member->update(['last_seen_at' => now()]);
         $this->autoAdvanceIfNeeded();
 
+        if ($this->isHost) {
+            $this->syncWithSpotify();
+        }
+
         return null;
+    }
+
+    /**
+     * Detects playback changes made outside AuxRoom — pausing, seeking, or
+     * skipping from the Spotify app itself, or any other Spotify Connect
+     * client — and pulls the room's state back in line with reality. Only
+     * the host polls this, since it's the host's Spotify account being
+     * queried and every viewer's heartbeat would otherwise multiply calls.
+     */
+    private function syncWithSpotify(): void
+    {
+        if ($this->isMock || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
+            return;
+        }
+
+        // Only reconcile a session AuxRoom itself started — otherwise the
+        // host's unrelated personal Spotify listening would leak into the room.
+        if (! $this->room->now_playing_queue_item_id && ! $this->room->is_playing_fallback) {
+            return;
+        }
+
+        $state = app(SpotifyClientFactory::class)->forRoom($this->room)->getPlaybackState();
+
+        if (! $state) {
+            return;
+        }
+
+        $current = $this->room->nowPlaying;
+        $trackChanged = ! $this->room->is_playing_fallback
+            && $state['track_id']
+            && $current?->spotify_track_id !== $state['track_id'];
+
+        if ($trackChanged) {
+            $matched = $this->room->pendingQueueItems()->where('spotify_track_id', $state['track_id'])->first();
+
+            if ($matched) {
+                $this->room->queueItems()
+                    ->whereNull('played_at')
+                    ->where('position', '<', $matched->position)
+                    ->update(['played_at' => now()]);
+
+                $this->room->update(['now_playing_queue_item_id' => $matched->id]);
+            }
+        }
+
+        $drifted = abs($state['progress_ms'] - $this->room->currentPositionMs()) > 3000;
+        $playStateChanged = $state['is_playing'] !== $this->room->is_playing;
+
+        if (! $drifted && ! $playStateChanged && ! $trackChanged) {
+            return;
+        }
+
+        $this->room->update([
+            'is_playing' => $state['is_playing'],
+            'now_playing_position_ms' => $state['progress_ms'],
+            'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
+        ]);
+
+        $this->broadcastUpdate('playback');
     }
 
     /**
@@ -848,9 +911,32 @@ class ShowRoom extends Component
         );
     }
 
+    /**
+     * Prefers whatever device Spotify currently reports as active over a
+     * manually-picked one — the manual "Choose device" picker in Host Hub
+     * only mattered because nothing auto-detected this before. Falls back
+     * to the last manual pick if nothing is currently active anywhere.
+     */
     private function providerDeviceId(): ?string
     {
-        return $this->room->playbackProvider?->spotifyAccount?->active_device_id;
+        $account = $this->room->playbackProvider?->spotifyAccount;
+
+        if (! $account || ! $account->access_token) {
+            return $account?->active_device_id;
+        }
+
+        $active = collect(app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices())
+            ->firstWhere('is_active', true);
+
+        if ($active) {
+            if ($account->active_device_id !== $active['id']) {
+                $account->update(['active_device_id' => $active['id'], 'active_device_name' => $active['name']]);
+            }
+
+            return $active['id'];
+        }
+
+        return $account->active_device_id;
     }
 
     private function startPlayback(QueueItem $item): bool
