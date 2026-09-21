@@ -129,7 +129,7 @@
                 </p>
                 <ul class="mt-2 divide-y divide-white/5">
                     @foreach ($playlistItems as $item)
-                        <li class="group py-2.5 flex items-center gap-3 opacity-60 hover:opacity-100 {{ $this->canGuest('guests_can_manage_playlist') ? 'cursor-pointer' : '' }}"
+                        <li class="group py-2.5 flex items-center gap-3 {{ $this->canGuest('guests_can_manage_playlist') ? 'cursor-pointer -mx-2 px-2 rounded-lg hover:bg-white/5' : '' }}"
                             @if ($this->canGuest('guests_can_manage_playlist'))
                                 wire:click="playFromPlaylist('{{ $item->spotify_track_id }}')"
                             @endif>
@@ -149,6 +149,9 @@
                                 <p class="truncate text-xs font-medium">{{ $item->name }}</p>
                                 <p class="truncate text-[11px] text-aux-faint">{{ $item->artist }}</p>
                             </div>
+                            @if ($this->canGuest('guests_can_manage_playlist'))
+                                <x-icon name="play" class="w-3 h-3 text-aux-faint shrink-0 group-hover:text-aux-accent" />
+                            @endif
                             <span class="shrink-0 text-[11px] text-aux-faint">{{ gmdate('i:s', intdiv($item->duration_ms, 1000)) }}</span>
                         </li>
                     @endforeach
