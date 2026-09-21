@@ -34,7 +34,7 @@
                                    @mouseup="dragging = false" @touchend="dragging = false"
                                    @input="positionMs = Number($event.target.value)"
                                    :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%)`"
-                                   @disabled(! $this->canGuest('guests_can_seek')) class="seek-bar flex-1 disabled:opacity-30">
+                                   @disabled(! $this->canGuest('guests_can_seek')) class="flex-1 disabled:opacity-30">
                             <span x-text="formatMs(durationMs)"></span>
                         </div>
 

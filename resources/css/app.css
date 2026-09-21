@@ -44,12 +44,6 @@ input[type='range']:disabled {
     cursor: not-allowed;
 }
 
-/* The seek/progress bar specifically gets a much taller click-and-drag
-   area than the default slider, while keeping the same thin visual track. */
-input[type='range'].seek-bar {
-    height: 24px;
-}
-
 /* Homepage aurora background — a few large, blurred green glows drifting
    slowly behind the content, before any interaction happens. */
 .aurora {
