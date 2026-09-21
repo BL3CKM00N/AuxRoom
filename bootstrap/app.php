@@ -13,7 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Dokploy/Traefik terminates TLS and proxies plain HTTP to the app,
+        // so Laravel must trust the proxy to see the request as HTTPS —
+        // otherwise secure cookies and https:// URL generation break.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
