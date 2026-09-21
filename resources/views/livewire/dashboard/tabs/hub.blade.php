@@ -52,8 +52,8 @@
             Guests can join from any mobile or desktop browser using this permanent code. No Spotify account or app download required.
         </p>
         <div class="mt-4 flex flex-wrap items-center gap-3">
-            <button type="button" @click="copyCode()" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-aux-accent text-black text-sm font-semibold hover:bg-aux-accent-strong">
-                <x-icon name="copy" class="w-4 h-4" /> Copy invite code
+            <button type="button" @click="copyLink()" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-aux-accent text-black text-sm font-semibold hover:bg-aux-accent-strong">
+                <x-icon name="copy" class="w-4 h-4" /> Copy invite link
             </button>
             <a href="{{ route('rooms.party', $room) }}" target="_blank"
                class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-aux-card-hover">
@@ -75,7 +75,7 @@
             {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)->generate(route('join', ['code' => $room->invite_code])) !!}
         </div>
         <p class="mt-3 text-sm font-medium">Scan to join the room</p>
-        <p class="text-xs text-aux-faint">The invite code is still required</p>
+        <p class="mt-1 text-lg font-bold tracking-wide">{{ $room->invite_code }}</p>
     </div>
 </div>
 
@@ -86,7 +86,7 @@
 
 <div class="flex flex-col items-center gap-4">
 
-    {{-- Room details: name + radius, the room's core identity — goes first --}}
+    {{-- Room details: name + radius, the room's core identity, goes first --}}
     <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col">
         <x-icon name="cog" class="w-4 h-4 text-aux-accent" />
         <p class="mt-2 font-medium text-sm">Room details</p>
@@ -104,17 +104,26 @@
             </div>
         </div>
 
-        <div class="mt-auto pt-2.5 flex items-center justify-between gap-2">
-            <button wire:click="toggleLocationEnforced" class="text-xs text-aux-muted underline">
-                {{ $room->location_enforced ? 'Disable enforcement' : 'Enable enforcement' }}
+        <div class="mt-3 flex items-center justify-between gap-2 py-2 border-t border-aux-border">
+            <div>
+                <p class="text-xs font-medium">Location restriction</p>
+                <p class="text-[11px] text-aux-faint">Guests must be within the radius to control playback.</p>
+            </div>
+            <button type="button"
+                    wire:click="requestConfirm('toggleLocationEnforced', [], '{{ $room->location_enforced ? 'Turn off location restriction? Guests anywhere will be able to control playback.' : 'Turn on location restriction? Guests outside the radius will be unable to control playback.' }}', '{{ $room->location_enforced ? 'Turn off' : 'Turn on' }}', false)"
+                    class="relative inline-flex h-5 w-9 items-center rounded-full transition shrink-0 {{ $room->location_enforced ? 'bg-aux-accent' : 'bg-white/10' }}">
+                <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition {{ $room->location_enforced ? 'translate-x-5' : 'translate-x-1' }}"></span>
             </button>
+        </div>
+
+        <div class="mt-auto pt-2.5 flex items-center justify-end gap-2">
             <button wire:click="saveRoomDetails" class="px-4 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium">
                 Save
             </button>
         </div>
     </div>
 
-    {{-- Private room + shared controls: the two access toggles, paired next to room details --}}
+    {{-- Private room + guest permissions: the two access toggles, paired next to room details --}}
     <button wire:click="requestConfirm('togglePrivate', [], '{{ $room->is_private ? 'Make this room public? Anyone with the code will join instantly, with no approval needed.' : 'Make this room private? New guests will need your approval before they can join.' }}', '{{ $room->is_private ? 'Make public' : 'Make private' }}', false)"
             class="w-full text-left p-5 rounded-xl bg-aux-card border border-aux-border hover:bg-aux-card-hover">
         <div class="flex items-center justify-between">
@@ -125,7 +134,7 @@
         </div>
         <p class="mt-2 font-medium text-sm">Private room</p>
         <p class="text-xs text-aux-faint mt-1">Only invited people can see playback data.</p>
-        <p class="text-xs text-aux-faint">Host can revoke access at any time</p>
+        <p class="text-xs text-aux-faint">Host can revoke access at any time.</p>
     </button>
 
     <button wire:click="setTab('guests')" class="w-full text-left p-5 rounded-xl bg-aux-card border border-aux-border hover:bg-aux-card-hover">
@@ -137,33 +146,38 @@
         </div>
         <p class="mt-2 font-medium text-sm">Guest permissions</p>
         <p class="text-xs text-aux-faint mt-1">Choose what each guest can do</p>
-        <p class="text-xs text-aux-faint">Play, pause, skip, seek, volume, add songs — per guest, plus the emergency stop.</p>
+        <p class="text-xs text-aux-faint">Play, pause, skip, seek, volume, add songs. Per guest, plus the emergency stop.</p>
         <span class="mt-3 inline-flex text-xs font-medium text-aux-accent items-center gap-1">
             Open Guest Portal <x-icon name="chevron-right" class="w-3 h-3" />
         </span>
     </button>
 
-    {{-- Spotify connection: the playback source, goes next since the rest of the row depends on it --}}
-    <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border">
-        <x-icon name="shield" class="w-4 h-4 text-aux-accent" />
-        <p class="mt-2 font-medium text-sm">Spotify connection</p>
-        <p class="text-xs text-aux-faint mt-1">Credentials stay on the server</p>
-
-        @if ($room->playbackProvider?->hasSpotifyConnected())
-            <p class="text-sm mt-2">Connected as {{ $room->playbackProvider->spotifyAccount->display_name ?? $room->playbackProvider->name }}</p>
-            <form method="POST" action="{{ route('spotify.disconnect') }}" class="mt-3">
-                @csrf
-                @method('DELETE')
-                <button type="submit" class="text-xs font-medium text-red-400 hover:text-red-300">Disconnect Spotify</button>
-            </form>
-        @else
-            <div class="mt-3">
-                <x-spotify-connect-form :account="auth()->user()->spotifyAccount" />
+    {{-- Emergency stop --}}
+    <div class="w-full p-5 rounded-xl bg-red-500/10 border border-red-500/30">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <x-icon name="zap" class="w-4 h-4 text-red-400" />
+                <h3 class="font-semibold">Emergency stop</h3>
             </div>
+            @unless ($room->guests_can_add_to_queue)
+                <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">QUEUE LOCKED</span>
+            @endunless
+        </div>
+        <p class="mt-1 text-xs text-aux-muted">
+            Instantly stop everyone from adding songs, overriding individual permissions. Use this if something inappropriate gets added.
+        </p>
+        @if ($room->guests_can_add_to_queue)
+            <button wire:click="emergencyStopQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-400">
+                Lock the queue now
+            </button>
+        @else
+            <button wire:click="reopenQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-900 text-white text-sm font-semibold hover:bg-red-800">
+                Unlock the queue
+            </button>
         @endif
     </div>
 
-    {{-- Playback device + shared queue: depend on the Spotify connection above --}}
+    {{-- Playback device --}}
     <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border" x-data="{ open: false }">
         <x-icon name="speaker" class="w-4 h-4 text-aux-accent" />
         <p class="mt-2 font-medium text-sm">Playback device</p>
@@ -184,16 +198,28 @@
         @endif
     </div>
 
-    <button wire:click="setTab('queue')" class="w-full text-left p-5 rounded-xl bg-aux-card border border-aux-border hover:bg-aux-card-hover">
-        <div class="flex items-center justify-between">
-            <x-icon name="queue-list" class="w-4 h-4 text-aux-accent" />
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-aux-accent-soft text-aux-accent">{{ $this->queue->count() }} tracks</span>
-        </div>
-        <p class="mt-2 font-medium text-sm">Shared queue</p>
-        <p class="text-xs text-aux-faint mt-1">Everyone gets a turn</p>
-        <p class="text-xs text-aux-faint">Search Spotify and add your next song.</p>
-        <span class="mt-3 inline-flex text-xs font-medium text-aux-accent items-center gap-1">
-            Open collaborative queue <x-icon name="chevron-right" class="w-3 h-3" />
-        </span>
-    </button>
+    {{-- Room activity: host always sees it; collapsed by default (see the partial) --}}
+    <div class="w-full">
+        @include('livewire.dashboard.tabs.partials.activity')
+    </div>
+
+    {{-- Spotify connection: goes last, it's setup rather than day-to-day control --}}
+    <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border">
+        <x-icon name="shield" class="w-4 h-4 text-aux-accent" />
+        <p class="mt-2 font-medium text-sm">Spotify connection</p>
+        <p class="text-xs text-aux-faint mt-1">Credentials stay on the server</p>
+
+        @if ($room->playbackProvider?->hasSpotifyConnected())
+            <p class="text-sm mt-2">Connected as {{ $room->playbackProvider->spotifyAccount->display_name ?? $room->playbackProvider->name }}</p>
+            <form method="POST" action="{{ route('spotify.disconnect') }}" class="mt-3">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="text-xs font-medium text-red-400 hover:text-red-300">Disconnect Spotify</button>
+            </form>
+        @else
+            <div class="mt-3">
+                <x-spotify-connect-form :account="auth()->user()->spotifyAccount" />
+            </div>
+        @endif
+    </div>
 </div>

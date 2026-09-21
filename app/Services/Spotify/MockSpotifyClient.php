@@ -88,4 +88,14 @@ class MockSpotifyClient implements SpotifyClientContract
     {
         return true;
     }
+
+    public function setShuffle(bool $enabled, ?string $deviceId = null): bool
+    {
+        return true;
+    }
+
+    public function setRepeat(string $mode, ?string $deviceId = null): bool
+    {
+        return true;
+    }
 }

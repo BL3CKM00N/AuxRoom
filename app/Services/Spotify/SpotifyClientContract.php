@@ -54,6 +54,11 @@ interface SpotifyClientContract
 
     public function skipToPrevious(?string $deviceId = null): bool;
 
+    public function setShuffle(bool $enabled, ?string $deviceId = null): bool;
+
+    /** @param string $mode One of 'off', 'context', 'track'. */
+    public function setRepeat(string $mode, ?string $deviceId = null): bool;
+
     /**
      * Spotify's own live upcoming queue — the authoritative "what's next",
      * covering both natively-queued tracks and upcoming shuffled tracks
@@ -71,7 +76,7 @@ interface SpotifyClientContract
      * device, etc). Includes full track metadata so the room can display
      * exactly what's playing even if it wasn't added through AuxRoom.
      *
-     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int, context_uri: ?string}|null
+     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int, context_uri: ?string, shuffle_enabled: bool, repeat_mode: string}|null
      */
     public function getPlaybackState(): ?array;
 }

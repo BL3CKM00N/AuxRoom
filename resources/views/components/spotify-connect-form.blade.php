@@ -2,7 +2,7 @@
 
 <div class="text-sm text-aux-muted space-y-3">
     <p>
-        AuxRoom doesn't ship with a shared Spotify app — connect <strong class="text-aux-text">your own</strong>
+        AuxRoom doesn't ship with a shared Spotify app. Connect <strong class="text-aux-text">your own</strong>
         Spotify Developer app so your credentials and playback stay under your control.
     </p>
     <ol class="list-decimal list-inside space-y-1 text-xs">

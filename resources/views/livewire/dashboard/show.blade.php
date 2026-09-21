@@ -9,7 +9,7 @@
         </span>
         <h1 class="mt-5 text-xl font-semibold">Waiting for the host to let you in</h1>
         <p class="mt-2 text-sm text-aux-muted max-w-sm">
-            {{ $room->name }} is a private room. You'll join automatically as soon as the host approves your request — no need to refresh.
+            {{ $room->name }} is a private room. You'll join automatically as soon as the host approves your request. No need to refresh.
         </p>
         <button wire:click="leaveRoom" class="mt-6 text-sm text-aux-muted underline">Cancel and leave</button>
     </div>
@@ -163,10 +163,10 @@
         </div>
 
         <div class="hidden md:flex items-center gap-3 w-48 justify-end shrink-0">
-            <button wire:click="setTab('queue')" class="text-aux-muted hover:text-aux-text"><x-icon name="queue-list" class="w-4 h-4" /></button>
+            <button wire:click="setTab('queue')" class="flex items-center text-aux-muted hover:text-aux-text"><x-icon name="queue-list" class="w-4 h-4" /></button>
             @if ($this->isHost)
-                <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="text-aux-muted hover:text-aux-text">
+                <div class="relative flex items-center h-4" x-data="{ open: false }">
+                    <button @click="open = !open" class="flex items-center text-aux-muted hover:text-aux-text">
                         <x-icon name="device" class="w-4 h-4" />
                     </button>
                     <div x-show="open" x-cloak @click.outside="open = false"
@@ -177,12 +177,12 @@
                                 {{ $device['name'] }}
                             </button>
                         @empty
-                            <p class="text-xs text-aux-faint px-3 py-2">No devices found — open Spotify somewhere first.</p>
+                            <p class="text-xs text-aux-faint px-3 py-2">No devices found. Open Spotify somewhere first.</p>
                         @endforelse
                     </div>
                 </div>
             @else
-                <span class="text-aux-faint opacity-40"><x-icon name="device" class="w-4 h-4" /></span>
+                <span class="flex items-center text-aux-faint opacity-40"><x-icon name="device" class="w-4 h-4" /></span>
             @endif
             <x-icon name="volume" class="w-4 h-4 {{ $this->canGuest('guests_can_set_volume') ? 'text-aux-muted' : 'text-aux-faint opacity-40' }}" />
             <input type="range" min="0" max="100" value="{{ $room->volume_percent }}" @disabled(! $this->canGuest('guests_can_set_volume'))
@@ -237,8 +237,8 @@
                     alert('Could not get your location.');
                 });
             },
-            copyCode() {
-                navigator.clipboard.writeText('{{ $room->invite_code }}');
+            copyLink() {
+                navigator.clipboard.writeText('{{ route('join', ['code' => $room->invite_code]) }}');
             },
         };
     }

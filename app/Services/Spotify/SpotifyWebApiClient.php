@@ -181,6 +181,28 @@ class SpotifyWebApiClient implements SpotifyClientContract
         return $this->postWithQuery('https://api.spotify.com/v1/me/player/previous', $deviceId ? ['device_id' => $deviceId] : []);
     }
 
+    public function setShuffle(bool $enabled, ?string $deviceId = null): bool
+    {
+        $query = ['state' => $enabled ? 'true' : 'false'];
+
+        if ($deviceId) {
+            $query['device_id'] = $deviceId;
+        }
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/shuffle', $query, []);
+    }
+
+    public function setRepeat(string $mode, ?string $deviceId = null): bool
+    {
+        $query = ['state' => $mode];
+
+        if ($deviceId) {
+            $query['device_id'] = $deviceId;
+        }
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/repeat', $query, []);
+    }
+
     private function postWithQuery(string $url, array $query): bool
     {
         if (! empty($query)) {
@@ -252,6 +274,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'album_art_url' => $item['album']['images'][0]['url'] ?? null,
             'duration_ms' => (int) ($item['duration_ms'] ?? 0),
             'context_uri' => $json['context']['uri'] ?? null,
+            'shuffle_enabled' => (bool) ($json['shuffle_state'] ?? false),
+            'repeat_mode' => $json['repeat_state'] ?? 'off',
         ];
     }
 

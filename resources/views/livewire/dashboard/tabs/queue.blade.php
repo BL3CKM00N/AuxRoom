@@ -34,7 +34,7 @@
                                    @mouseup="dragging = false" @touchend="dragging = false"
                                    @input="positionMs = Number($event.target.value)"
                                    :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%)`"
-                                   @disabled(! $this->canGuest('guests_can_seek')) class="flex-1 disabled:opacity-30">
+                                   @disabled(! $this->canGuest('guests_can_seek')) class="seek-bar flex-1 disabled:opacity-30">
                             <span x-text="formatMs(durationMs)"></span>
                         </div>
 
@@ -42,9 +42,13 @@
                             @if ($this->isMock)
                                 <span class="px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-semibold text-aux-muted">SAMPLE TRACK</span>
                             @endif
+                            <button wire:click="toggleShuffle" @disabled(! $this->canGuest('guests_can_play_pause'))
+                                    class="disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
+                                <x-icon name="shuffle" class="w-4 h-4" />
+                            </button>
                             <button wire:click="previous" @disabled(! $this->canGuest('guests_can_skip'))
-                                    class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
-                                <x-icon name="back" class="w-4 h-4" />
+                                    class="inline-flex items-center gap-1 text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
+                                <x-icon name="back" class="w-4 h-4" /> Previous
                             </button>
                             @if ($room->is_playing)
                                 <button wire:click="pause" @disabled(! $this->canGuest('guests_can_play_pause'))
@@ -61,6 +65,13 @@
                                     class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
                                 <x-icon name="skip" class="w-3.5 h-3.5" /> Skip track
                             </button>
+                            <button wire:click="toggleRepeat" @disabled(! $this->canGuest('guests_can_play_pause'))
+                                    class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->repeat_mode !== 'off' ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
+                                <x-icon name="repeat" class="w-4 h-4" />
+                                @if ($room->repeat_mode === 'track')
+                                    <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black text-[8px] font-bold flex items-center justify-center">1</span>
+                                @endif
+                            </button>
                         </div>
                     @else
                         <button wire:click="play" @disabled(($this->queue->isEmpty() && ! $room->fallback_playlist_uri) || ! $this->canGuest('guests_can_play_pause'))
@@ -73,11 +84,15 @@
         </div>
 
         {{-- Up next --}}
+        @php
+            $queuedItems = $this->queue->where('is_queued', true)->values();
+            $playlistItems = $this->queue->where('is_queued', false)->values();
+        @endphp
         <div class="p-6 rounded-xl bg-aux-card border border-aux-border">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <h3 class="font-semibold">Up Next</h3>
-                    <span class="px-2 py-0.5 rounded-full bg-aux-accent-soft text-aux-accent text-[11px] font-semibold">{{ $this->queue->count() }} tracks</span>
+                    <span class="px-2 py-0.5 rounded-full bg-aux-accent-soft text-aux-accent text-[11px] font-semibold">{{ $this->queuedCount }} tracks</span>
                 </div>
                 <button type="button" @click="$refs.queueSearch.focus()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-aux-card-hover text-xs font-medium">
                     <x-icon name="plus" class="w-3.5 h-3.5" /> Add a song
@@ -85,7 +100,7 @@
             </div>
 
             <ul class="mt-4 divide-y divide-white/5">
-                @forelse ($this->queue as $i => $item)
+                @forelse ($queuedItems as $i => $item)
                     <li class="py-3 flex items-center gap-3">
                         <span class="w-5 text-xs text-aux-accent font-semibold shrink-0">#{{ $i + 1 }}</span>
                         <div class="w-10 h-10 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
@@ -102,27 +117,60 @@
                         <span class="shrink-0 text-xs text-aux-faint">{{ gmdate('i:s', intdiv($item->duration_ms, 1000)) }}</span>
                     </li>
                 @empty
-                    <li class="py-6 text-center text-sm text-aux-faint">Queue is empty — add the first track.</li>
+                    <li class="py-6 text-center text-sm text-aux-faint">Queue is empty. Add the first track.</li>
                 @endforelse
             </ul>
+
+            @if ($playlistItems->isNotEmpty())
+                <p class="mt-5 pt-4 border-t border-aux-border text-[10px] uppercase tracking-widest text-aux-faint">
+                    Coming up from {{ $room->fallback_playlist_name }}
+                </p>
+                <ul class="mt-2 divide-y divide-white/5">
+                    @foreach ($playlistItems as $item)
+                        <li class="py-2.5 flex items-center gap-3 opacity-60">
+                            <div class="w-8 h-8 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
+                                @if ($item->album_art_url)
+                                    <img src="{{ $item->album_art_url }}" class="w-full h-full object-cover" alt="">
+                                @else
+                                    <x-icon name="note" class="w-3.5 h-3.5 text-aux-faint" />
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-xs font-medium">{{ $item->name }}</p>
+                                <p class="truncate text-[11px] text-aux-faint">{{ $item->artist }}</p>
+                            </div>
+                            <span class="shrink-0 text-[11px] text-aux-faint">{{ gmdate('i:s', intdiv($item->duration_ms, 1000)) }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
     </div>
 
     <div class="space-y-6">
 
         {{-- Find music --}}
+        @php
+            $outOfRange = ! $this->isHost && $room->location_enforced && ! $this->member->passesLocationCheck();
+        @endphp
         <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
             <div class="flex items-center justify-between">
                 <h3 class="font-semibold">Find Music</h3>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $room->guests_can_add_to_queue ? 'bg-aux-accent-soft text-aux-accent' : 'bg-red-500/10 text-red-400' }}">
-                    {{ $room->guests_can_add_to_queue ? 'AUX OPEN' : 'QUEUE LOCKED' }}
-                </span>
+                @if ($outOfRange)
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400">OUT OF RANGE</span>
+                @else
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $room->guests_can_add_to_queue ? 'bg-aux-accent-soft text-aux-accent' : 'bg-red-500/10 text-red-400' }}">
+                        {{ $room->guests_can_add_to_queue ? 'AUX OPEN' : 'QUEUE LOCKED' }}
+                    </span>
+                @endif
             </div>
 
             @if ($this->isMock)
                 <p class="mt-3 text-sm text-aux-faint">
-                    {{ $this->isHost ? 'Connect Spotify in Host Hub to search for real songs.' : "The host hasn't connected Spotify yet — song search isn't available." }}
+                    {{ $this->isHost ? 'Connect Spotify in Host Hub to search for real songs.' : "The host hasn't connected Spotify yet. Song search isn't available." }}
                 </p>
+            @elseif ($outOfRange)
+                <p class="mt-3 text-sm text-amber-400">You're outside the room's range. Move closer to add songs.</p>
             @else
                 <div class="mt-3 relative">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-aux-faint">
@@ -159,25 +207,27 @@
                         </li>
                     @empty
                         <li class="text-sm text-aux-faint py-3">
-                            {{ $this->canGuest('guests_can_add_to_queue') ? 'Search for a song to add it to the queue.' : 'The host has locked the queue — no new songs can be added right now.' }}
+                            {{ $this->canGuest('guests_can_add_to_queue') ? 'Search for a song to add it to the queue.' : 'The host has locked the queue. No new songs can be added right now.' }}
                         </li>
                     @endforelse
                 </ul>
             @endif
 
-            <div class="mt-4 pt-4 border-t border-aux-border grid grid-cols-3 text-center">
+            <div class="mt-4 pt-4 border-t border-aux-border grid {{ $room->location_enforced ? 'grid-cols-3' : 'grid-cols-2' }} text-center">
                 <div>
                     <p class="text-lg font-bold text-aux-accent">{{ $this->onlineCount }}</p>
                     <p class="text-[10px] uppercase tracking-wide text-aux-faint">Online</p>
                 </div>
                 <div>
-                    <p class="text-lg font-bold">{{ $this->queue->count() }}</p>
+                    <p class="text-lg font-bold">{{ $this->queuedCount }}</p>
                     <p class="text-[10px] uppercase tracking-wide text-aux-faint">Queued</p>
                 </div>
-                <div>
-                    <p class="text-lg font-bold">{{ $room->location_radius_m ?? '—' }}{{ $room->location_radius_m ? ' m' : '' }}</p>
-                    <p class="text-[10px] uppercase tracking-wide text-aux-faint">Control radius</p>
-                </div>
+                @if ($room->location_enforced)
+                    <div>
+                        <p class="text-lg font-bold">{{ $room->location_radius_m }} m</p>
+                        <p class="text-[10px] uppercase tracking-wide text-aux-faint">Control radius</p>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -187,7 +237,7 @@
                 <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify.</p>
                 <p class="mt-3 text-sm text-aux-faint">
-                    {{ $this->isHost ? 'Connect Spotify in Host Hub to play a playlist.' : "The host hasn't connected Spotify yet — playlists aren't available." }}
+                    {{ $this->isHost ? 'Connect Spotify in Host Hub to play a playlist.' : "The host hasn't connected Spotify yet. Playlists aren't available." }}
                 </p>
             </div>
         @elseif ($this->canGuest('guests_can_manage_playlist'))
@@ -209,10 +259,12 @@
                                 <x-icon name="queue-list" class="w-4 h-4 text-aux-faint" />
                             @endif
                         </div>
-                        <p class="min-w-0 flex-1 truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
-                        <button wire:click="stopPlaylist" class="shrink-0 text-[11px] font-medium text-red-400 hover:text-red-300">
-                            Stop
-                        </button>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
+                            @if ($room->is_playing_fallback && $this->nowPlaying)
+                                <p class="truncate text-xs text-aux-accent">Now playing: {{ $this->nowPlaying->name }}</p>
+                            @endif
+                        </div>
                     </div>
                 @endif
 
@@ -269,11 +321,14 @@
                             <x-icon name="queue-list" class="w-4 h-4 text-aux-faint" />
                         @endif
                     </div>
-                    <p class="min-w-0 flex-1 truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
+                        @if ($room->is_playing_fallback && $this->nowPlaying)
+                            <p class="truncate text-xs text-aux-accent">Now playing: {{ $this->nowPlaying->name }}</p>
+                        @endif
+                    </div>
                 </div>
             </div>
         @endif
-
-        @include('livewire.dashboard.tabs.partials.activity')
     </div>
 </div>

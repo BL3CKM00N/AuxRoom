@@ -35,6 +35,8 @@ class Room extends Model
         'now_playing_started_at',
         'now_playing_position_ms',
         'is_playing',
+        'shuffle_enabled',
+        'repeat_mode',
         'volume_percent',
     ];
 
@@ -44,6 +46,7 @@ class Room extends Model
             'is_private' => 'boolean',
             'guests_can_add_to_queue' => 'boolean',
             'is_playing_fallback' => 'boolean',
+            'shuffle_enabled' => 'boolean',
             'location_enforced' => 'boolean',
             'location_lat' => 'float',
             'location_lng' => 'float',

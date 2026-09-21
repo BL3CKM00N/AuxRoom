@@ -11,37 +11,13 @@
     <div class="lg:col-span-2 space-y-6">
 
     @if ($this->isHost)
-        <div class="p-5 rounded-xl bg-red-500/10 border border-red-500/30">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <x-icon name="zap" class="w-4 h-4 text-red-400" />
-                    <h3 class="font-semibold">Emergency stop</h3>
-                </div>
-                @unless ($room->guests_can_add_to_queue)
-                    <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">QUEUE LOCKED</span>
-                @endunless
-            </div>
-            <p class="mt-1 text-xs text-aux-muted">
-                Instantly stop everyone from adding songs, overriding individual permissions — use this if something inappropriate gets added.
-            </p>
-            @if ($room->guests_can_add_to_queue)
-                <button wire:click="emergencyStopQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-400">
-                    Lock the queue now
-                </button>
-            @else
-                <button wire:click="reopenQueue" class="mt-3 w-full py-2.5 rounded-full bg-red-900 text-white text-sm font-semibold hover:bg-red-800">
-                    Unlock the queue
-                </button>
-            @endif
-        </div>
-
         <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
             <div class="flex items-center gap-2">
                 <x-icon name="users" class="w-4 h-4 text-aux-accent" />
                 <h3 class="font-semibold">Guest permissions</h3>
             </div>
             <p class="mt-1 text-xs text-aux-muted">
-                Every guest starts with no permissions. Grant each one individually below, per guest — there's no shared default anymore.
+                Every guest starts with no permissions. Grant each one individually below, per guest. There's no shared default.
             </p>
         </div>
     @endif
@@ -134,6 +110,7 @@
                                 'guests_can_seek' => ['can_seek', 'Seek / scrub'],
                                 'guests_can_set_volume' => ['can_set_volume', 'Change volume'],
                                 'guests_can_manage_playlist' => ['can_manage_playlist', 'Play a playlist'],
+                                'guests_can_view_activity' => ['can_view_activity', 'View room activity'],
                             ] as $ability => [$column, $label])
                                 <button wire:click="setMemberPermission({{ $m->id }}, '{{ $ability }}', {{ $m->{$column} ? 'false' : 'true' }})"
                                         class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs {{ $m->{$column} ? 'bg-aux-accent-soft text-aux-accent' : 'bg-white/5 text-aux-faint' }}">
@@ -156,5 +133,17 @@
 
     </div>
 
-    @include('livewire.dashboard.tabs.partials.activity')
+    <div class="space-y-6">
+        <div class="p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col items-center text-center">
+            <div class="p-3 bg-white rounded-lg">
+                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)->generate(route('join', ['code' => $room->invite_code])) !!}
+            </div>
+            <p class="mt-3 text-sm font-medium">Scan to join the room</p>
+            <p class="mt-1 text-lg font-bold tracking-wide">{{ $room->invite_code }}</p>
+        </div>
+
+        @if ($this->canGuest('guests_can_view_activity'))
+            @include('livewire.dashboard.tabs.partials.activity')
+        @endif
+    </div>
 </div>

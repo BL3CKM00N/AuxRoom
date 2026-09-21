@@ -50,8 +50,12 @@
                     <div class="mt-3 flex flex-wrap gap-3">
                         @foreach ($this->upNext as $i => $item)
                             <div class="flex items-center gap-3 pl-2 pr-4 py-2 rounded-xl bg-aux-card border border-aux-border">
-                                <div class="w-9 h-9 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0">
-                                    <x-icon name="note" class="w-4 h-4 text-aux-faint" />
+                                <div class="w-9 h-9 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
+                                    @if ($item->album_art_url)
+                                        <img src="{{ $item->album_art_url }}" class="w-full h-full object-cover" alt="">
+                                    @else
+                                        <x-icon name="note" class="w-4 h-4 text-aux-faint" />
+                                    @endif
                                 </div>
                                 <div class="min-w-0">
                                     <p class="text-sm font-medium truncate max-w-[10rem]">{{ $item->name }}</p>

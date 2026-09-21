@@ -23,7 +23,7 @@
                 <p class="mt-2 text-sm text-aux-muted max-w-sm mx-auto">
                     Connect your own Spotify Developer app so your room can play real music
                     and control a real device. You can skip this and set it up later from the
-                    Host Hub — the room will run in demo mode until then.
+                    Host Hub. The room will run in demo mode until then.
                 </p>
 
                 <div class="mt-6 max-w-sm mx-auto text-left">
@@ -40,7 +40,7 @@
             <div x-show="step === 2" x-cloak>
                 @unless ($hasSpotify)
                     <div class="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-lg text-sm flex items-center justify-between gap-3">
-                        <span>Spotify isn't connected yet — this room will start in demo mode.</span>
+                        <span>Spotify isn't connected yet. This room will start in demo mode.</span>
                         <button type="button" @click="step = 1" class="shrink-0 underline font-medium">Connect now</button>
                     </div>
                 @endunless
@@ -60,7 +60,7 @@
                         <input type="checkbox" id="is_private" name="is_private" value="1" checked
                                class="mt-1 rounded border-aux-border text-aux-accent bg-aux-card-hover focus:ring-aux-accent">
                         <label for="is_private" class="text-sm text-aux-muted">
-                            <span class="font-medium">Private room</span> — only invited people can see playback data.
+                            <span class="font-medium">Private room</span>, only invited people can see playback data.
                         </label>
                     </div>
 
@@ -70,7 +70,7 @@
                                    x-model="locationEnforced"
                                    class="mt-1 rounded border-aux-border text-aux-accent bg-aux-card-hover focus:ring-aux-accent">
                             <label for="location_enforced" class="text-sm text-aux-muted">
-                                <span class="font-medium">Location boundary</span> — require guests to be physically nearby to control playback.
+                                <span class="font-medium">Location boundary</span>, require guests to be physically nearby to control playback.
                             </label>
                         </div>
 

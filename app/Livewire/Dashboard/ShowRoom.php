@@ -243,8 +243,10 @@ class ShowRoom extends Component
         $drifted = abs($state['progress_ms'] - $this->room->currentPositionMs()) > 3000;
         $playStateChanged = $state['is_playing'] !== $this->room->is_playing;
         $fallbackFlagChanged = $isFallbackContext !== $this->room->is_playing_fallback;
+        $shuffleChanged = $state['shuffle_enabled'] !== $this->room->shuffle_enabled;
+        $repeatChanged = $state['repeat_mode'] !== $this->room->repeat_mode;
 
-        if (! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged) {
+        if (! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
             return;
         }
 
@@ -259,6 +261,8 @@ class ShowRoom extends Component
             'is_playing' => $state['is_playing'],
             'now_playing_position_ms' => $state['progress_ms'],
             'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
+            'shuffle_enabled' => $state['shuffle_enabled'],
+            'repeat_mode' => $state['repeat_mode'],
         ]);
 
         $this->broadcastUpdate('playback');
@@ -322,6 +326,7 @@ class ShowRoom extends Component
         'guests_can_seek' => 'can_seek',
         'guests_can_set_volume' => 'can_set_volume',
         'guests_can_manage_playlist' => 'can_manage_playlist',
+        'guests_can_view_activity' => 'can_view_activity',
     ];
 
     /**
@@ -334,6 +339,12 @@ class ShowRoom extends Component
     {
         if ($this->isHost) {
             return true;
+        }
+
+        // Mirrors passesGate()'s location check — controls otherwise looked
+        // enabled for an out-of-range guest and only failed silently on click.
+        if (! $this->member->passesLocationCheck()) {
+            return false;
         }
 
         if ($ability === 'guests_can_add_to_queue') {
@@ -355,6 +366,12 @@ class ShowRoom extends Component
      * Attribution ("added by") is looked up per track, but never used to
      * decide order or content.
      */
+    /**
+     * Everything Spotify reports as coming up — both guest-queued tracks and
+     * upcoming tracks from a playing playlist's shuffle, tagged so the two
+     * can be told apart (is_queued). Playlist tracks were never "added" by
+     * anyone, so they shouldn't count toward queue counts or attribution.
+     */
     public function getQueueProperty()
     {
         if ($this->isMock || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
@@ -364,11 +381,11 @@ class ShowRoom extends Component
         $upcoming = app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue();
 
         return collect($upcoming)->map(function (array $track) {
-            $addedBy = $this->room->queueItems()
+            $queued = $this->room->queueItems()
                 ->where('spotify_track_id', $track['id'])
                 ->whereNull('played_at')
                 ->with('addedBy')
-                ->first()?->addedBy?->display_name;
+                ->first();
 
             return (object) [
                 'spotify_track_id' => $track['id'],
@@ -376,9 +393,16 @@ class ShowRoom extends Component
                 'artist' => $track['artist'],
                 'album_art_url' => $track['album_art_url'],
                 'duration_ms' => $track['duration_ms'],
-                'added_by_name' => $addedBy,
+                'added_by_name' => $queued?->addedBy?->display_name,
+                'is_queued' => $queued !== null,
             ];
         });
+    }
+
+    /** The subset of "Up Next" that was actually queued by someone — not upcoming playlist tracks. */
+    public function getQueuedCountProperty(): int
+    {
+        return $this->queue->where('is_queued', true)->count();
     }
 
     public function getActivityProperty()
@@ -482,7 +506,7 @@ class ShowRoom extends Component
             $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
             if (! $client->addToPlaybackQueue('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId())) {
-                $this->controlError = "Spotify couldn't queue that song — try reselecting the device in Host Hub.";
+                $this->controlError = "Spotify couldn't queue that song. Try reselecting the device in Host Hub.";
             }
         }
 
@@ -572,23 +596,6 @@ class ShowRoom extends Component
         $this->syncWithSpotify();
 
         $this->broadcastUpdate('playback');
-    }
-
-    public function stopPlaylist(): void
-    {
-        if (! $this->passesGate('guests_can_manage_playlist')) {
-            return;
-        }
-
-        $this->room->update([
-            'fallback_playlist_uri' => null,
-            'fallback_playlist_name' => null,
-            'fallback_playlist_image_url' => null,
-            'is_playing_fallback' => false,
-        ]);
-
-        $this->logActivity('settings', "{$this->member->display_name} stopped the playlist.");
-        $this->broadcastUpdate('settings');
     }
 
     /** Pulls a bare playlist ID out of a pasted Spotify link or URI, if it looks like one. */
@@ -725,6 +732,43 @@ class ShowRoom extends Component
         $this->broadcastUpdate('playback');
     }
 
+    public function toggleShuffle(): void
+    {
+        if (! $this->passesGate('guests_can_play_pause')) {
+            return;
+        }
+
+        $enabled = ! $this->room->shuffle_enabled;
+
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setShuffle($enabled, $this->providerDeviceId())) {
+            $this->controlError = "Spotify couldn't change shuffle.";
+
+            return;
+        }
+
+        $this->room->update(['shuffle_enabled' => $enabled]);
+        $this->broadcastUpdate('playback');
+    }
+
+    public function toggleRepeat(): void
+    {
+        if (! $this->passesGate('guests_can_play_pause')) {
+            return;
+        }
+
+        $modes = ['off', 'context', 'track'];
+        $next = $modes[(array_search($this->room->repeat_mode, $modes, true) + 1) % count($modes)];
+
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setRepeat($next, $this->providerDeviceId())) {
+            $this->controlError = "Spotify couldn't change repeat mode.";
+
+            return;
+        }
+
+        $this->room->update(['repeat_mode' => $next]);
+        $this->broadcastUpdate('playback');
+    }
+
     public function seek(int $ms): void
     {
         if (! $this->passesGate('guests_can_seek')) {
@@ -802,8 +846,8 @@ class ShowRoom extends Component
         $isPrivate = ! $this->room->is_private;
         $this->room->update(['is_private' => $isPrivate]);
         $this->logActivity('settings', $isPrivate
-            ? 'Room set to private — new guests now need approval to join.'
-            : 'Room set to public — anyone with the code can join instantly.');
+            ? 'Room set to private. New guests now need approval to join.'
+            : 'Room set to public. Anyone with the code can join instantly.');
         $this->broadcastUpdate('settings');
     }
 
@@ -846,7 +890,7 @@ class ShowRoom extends Component
         }
 
         $this->room->update(['guests_can_add_to_queue' => false]);
-        $this->logActivity('settings', 'Host locked the queue — no one can add songs right now.');
+        $this->logActivity('settings', 'Host locked the queue. No one can add songs right now.');
         $this->broadcastUpdate('settings');
     }
 
@@ -1077,7 +1121,7 @@ class ShowRoom extends Component
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
         if (! $client->playTrack('spotify:track:'.$spotifyTrackId, $this->providerDeviceId(), $positionMs)) {
-            $this->controlError = "Spotify couldn't start playback — try reselecting the device in Host Hub.";
+            $this->controlError = "Spotify couldn't start playback. Try reselecting the device in Host Hub.";
 
             return false;
         }
@@ -1119,7 +1163,7 @@ class ShowRoom extends Component
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
         if (! $client->playContext($this->room->fallback_playlist_uri, $this->providerDeviceId(), true)) {
-            $this->controlError = "Spotify couldn't start the fallback playlist — try reselecting the device in Host Hub.";
+            $this->controlError = "Spotify couldn't start the fallback playlist. Try reselecting the device in Host Hub.";
 
             return false;
         }

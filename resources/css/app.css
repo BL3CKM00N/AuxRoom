@@ -44,6 +44,75 @@ input[type='range']:disabled {
     cursor: not-allowed;
 }
 
+/* The seek/progress bar specifically gets a much taller click-and-drag
+   area than the default slider, while keeping the same thin visual track. */
+input[type='range'].seek-bar {
+    height: 24px;
+}
+
+/* Homepage aurora background — a few large, blurred green glows drifting
+   slowly behind the content, before any interaction happens. */
+.aurora {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.aurora__glow {
+    position: absolute;
+    width: 60vw;
+    height: 60vw;
+    max-width: 700px;
+    max-height: 700px;
+    border-radius: 9999px;
+    filter: blur(90px);
+    opacity: 0.35;
+    background: radial-gradient(circle, #22c55e 0%, rgba(34, 197, 94, 0) 70%);
+}
+
+.aurora__glow--1 {
+    top: -15%;
+    left: -10%;
+    animation: aurora-drift-1 22s ease-in-out infinite;
+}
+
+.aurora__glow--2 {
+    top: 20%;
+    right: -15%;
+    opacity: 0.25;
+    animation: aurora-drift-2 28s ease-in-out infinite;
+}
+
+.aurora__glow--3 {
+    bottom: -20%;
+    left: 20%;
+    opacity: 0.2;
+    animation: aurora-drift-3 34s ease-in-out infinite;
+}
+
+@keyframes aurora-drift-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(8%, 6%) scale(1.15); }
+}
+
+@keyframes aurora-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-10%, 8%) scale(1.1); }
+}
+
+@keyframes aurora-drift-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(6%, -10%) scale(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .aurora__glow {
+        animation: none;
+    }
+}
+
 input[type='range']::-webkit-slider-runnable-track {
     height: 4px;
     border-radius: 9999px;

@@ -12,7 +12,13 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="antialiased font-sans bg-aux-bg text-aux-text">
-        <div class="min-h-screen flex flex-col">
+        <div class="aurora" aria-hidden="true">
+            <span class="aurora__glow aurora__glow--1"></span>
+            <span class="aurora__glow aurora__glow--2"></span>
+            <span class="aurora__glow aurora__glow--3"></span>
+        </div>
+
+        <div class="relative min-h-screen flex flex-col">
             <header class="max-w-5xl mx-auto w-full px-6 py-8 flex items-center justify-between">
                 <a href="/" class="font-semibold text-lg flex items-center gap-2">
                     <span class="text-aux-accent"><x-icon name="zap" class="w-6 h-6" /></span> AuxRoom
@@ -57,7 +63,7 @@
                     </div>
 
                     <p class="mt-6 text-xs text-aux-faint flex items-center gap-1.5">
-                        <x-icon name="lock" class="w-3.5 h-3.5" /> Invite only. Uses your own Spotify account — no shared app, no middleman.
+                        <x-icon name="lock" class="w-3.5 h-3.5" /> Invite only. Uses your own Spotify account, no shared app, no middleman.
                     </p>
                 </div>
 
