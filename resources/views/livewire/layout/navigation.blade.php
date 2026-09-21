@@ -1,10 +1,22 @@
 <?php
 
 use App\Livewire\Actions\Logout;
+use App\Models\Room;
+use App\Models\RoomMember;
+use App\Services\RoomMembership;
 use Livewire\Volt\Component;
 
 new class extends Component
 {
+    /**
+     * Passed only for an anonymous guest viewing a room — guests aren't
+     * authenticated, so there's no auth()->user() to derive a "hosted
+     * room" or identity from the way the host's nav does.
+     */
+    public ?Room $room = null;
+
+    public ?int $memberId = null;
+
     /**
      * Log the current user out of the application.
      */
@@ -15,13 +27,43 @@ new class extends Component
         $this->redirect('/', navigate: true);
     }
 
+    public function leaveRoom(RoomMembership $membership): mixed
+    {
+        if ($this->guestMember) {
+            $membership->leave($this->guestMember);
+        }
+
+        return $this->redirect(url('/'), navigate: true);
+    }
+
+    public function getGuestMemberProperty(): ?RoomMember
+    {
+        return $this->memberId ? RoomMember::find($this->memberId) : null;
+    }
+
     public function with(): array
     {
+        // Guests never have an auth()->user(), so their room comes from
+        // the prop passed in by the room page itself instead.
+        $guestRoom = ! auth()->check() ? $this->room : null;
+
         return [
-            'hostedRoom' => auth()->user()?->activeHostedRoom(),
+            'hostedRoom' => $guestRoom ?? auth()->user()?->activeHostedRoom(),
+            'guestRoom' => $guestRoom,
+            'guestMember' => $this->guestMember,
         ];
     }
 }; ?>
+
+@php
+    $tabUrl = fn (string $tab) => $guestRoom
+        ? route('rooms.show', [$guestRoom, 'tab' => $tab])
+        : route('dashboard', ['tab' => $tab]);
+
+    $tabActive = fn (string $tab, string $default) => $guestRoom
+        ? request()->routeIs('rooms.show') && request()->query('tab', $default) === $tab
+        : request()->routeIs('dashboard') && request()->query('tab', $default) === $tab;
+@endphp
 
 <nav x-data="{ open: false }" wire:poll.5s="$refresh" class="bg-aux-sidebar border-b border-aux-border">
     <!-- Primary Navigation Menu -->
@@ -30,21 +72,28 @@ new class extends Component
             <div class="flex">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center text-aux-text">
-                    <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center">
+                    <a href="{{ $guestRoom ? $tabUrl('queue') : route('dashboard') }}" wire:navigate class="flex items-center">
                         <x-logo class="h-6" />
                     </a>
                 </div>
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    @if ($hostedRoom)
-                        <x-nav-link :href="route('dashboard', ['tab' => 'hub'])" :active="request()->routeIs('dashboard') && request()->query('tab', 'hub') === 'hub'" wire:navigate>
-                            Room Settings
-                        </x-nav-link>
-                        <x-nav-link :href="route('dashboard', ['tab' => 'queue'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'queue'" wire:navigate>
+                    @if ($guestRoom)
+                        <x-nav-link :href="$tabUrl('queue')" :active="$tabActive('queue', 'queue')" wire:navigate>
                             Now Playing
                         </x-nav-link>
-                        <x-nav-link :href="route('dashboard', ['tab' => 'guests'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'guests'" wire:navigate>
+                        <x-nav-link :href="route('rooms.party', $guestRoom)" target="_blank">
+                            Party Screen
+                        </x-nav-link>
+                    @elseif ($hostedRoom)
+                        <x-nav-link :href="$tabUrl('hub')" :active="$tabActive('hub', 'hub')" wire:navigate>
+                            Room Settings
+                        </x-nav-link>
+                        <x-nav-link :href="$tabUrl('queue')" :active="$tabActive('queue', 'hub')" wire:navigate>
+                            Now Playing
+                        </x-nav-link>
+                        <x-nav-link :href="$tabUrl('guests')" :active="$tabActive('guests', 'hub')" wire:navigate>
                             <span class="inline-flex items-center gap-1.5">
                                 Guests
                                 @if ($hostedRoom->pendingMembers()->count() > 0)
@@ -65,32 +114,39 @@ new class extends Component
 
             <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
-                <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-aux-muted bg-aux-sidebar hover:text-aux-text focus:outline-none transition ease-in-out duration-150">
-                            <div x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
+                @if ($guestRoom)
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm text-aux-muted">{{ $guestMember?->display_name }}</span>
+                        <button wire:click="leaveRoom" class="text-sm text-aux-muted hover:text-aux-text">Leave</button>
+                    </div>
+                @else
+                    <x-dropdown align="right" width="48">
+                        <x-slot name="trigger">
+                            <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-aux-muted bg-aux-sidebar hover:text-aux-text focus:outline-none transition ease-in-out duration-150">
+                                <div x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
 
-                            <div class="ms-1">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </button>
-                    </x-slot>
+                                <div class="ms-1">
+                                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                            </button>
+                        </x-slot>
 
-                    <x-slot name="content">
-                        <x-dropdown-link :href="route('profile')" wire:navigate>
-                            {{ __('Profile') }}
-                        </x-dropdown-link>
-
-                        <!-- Authentication -->
-                        <button wire:click="logout" class="w-full text-start">
-                            <x-dropdown-link>
-                                {{ __('Log Out') }}
+                        <x-slot name="content">
+                            <x-dropdown-link :href="route('profile')" wire:navigate>
+                                {{ __('Profile') }}
                             </x-dropdown-link>
-                        </button>
-                    </x-slot>
-                </x-dropdown>
+
+                            <!-- Authentication -->
+                            <button wire:click="logout" class="w-full text-start">
+                                <x-dropdown-link>
+                                    {{ __('Log Out') }}
+                                </x-dropdown-link>
+                            </button>
+                        </x-slot>
+                    </x-dropdown>
+                @endif
             </div>
 
             <!-- Hamburger -->
@@ -108,14 +164,21 @@ new class extends Component
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            @if ($hostedRoom)
-                <x-responsive-nav-link :href="route('dashboard', ['tab' => 'hub'])" :active="request()->routeIs('dashboard') && request()->query('tab', 'hub') === 'hub'" wire:navigate>
-                    Room Settings
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('dashboard', ['tab' => 'queue'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'queue'" wire:navigate>
+            @if ($guestRoom)
+                <x-responsive-nav-link :href="$tabUrl('queue')" :active="$tabActive('queue', 'queue')" wire:navigate>
                     Now Playing
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('dashboard', ['tab' => 'guests'])" :active="request()->routeIs('dashboard') && request()->query('tab') === 'guests'" wire:navigate>
+                <x-responsive-nav-link :href="route('rooms.party', $guestRoom)" target="_blank">
+                    Party Screen
+                </x-responsive-nav-link>
+            @elseif ($hostedRoom)
+                <x-responsive-nav-link :href="$tabUrl('hub')" :active="$tabActive('hub', 'hub')" wire:navigate>
+                    Room Settings
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="$tabUrl('queue')" :active="$tabActive('queue', 'hub')" wire:navigate>
+                    Now Playing
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="$tabUrl('guests')" :active="$tabActive('guests', 'hub')" wire:navigate>
                     Guests
                     @if ($hostedRoom->pendingMembers()->count() > 0)
                         <span class="ml-1 inline-flex w-4 h-4 rounded-full bg-aux-accent text-black text-[9px] font-bold items-center justify-center">{{ $hostedRoom->pendingMembers()->count() }}</span>
@@ -133,23 +196,38 @@ new class extends Component
 
         <!-- Responsive Settings Options -->
         <div class="pt-4 pb-1 border-t border-aux-border">
-            <div class="px-4">
-                <div class="font-medium text-base text-aux-text" x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
-                <div class="font-medium text-sm text-aux-muted">{{ auth()->user()->email }}</div>
-            </div>
+            @if ($guestRoom)
+                <div class="px-4">
+                    <div class="font-medium text-base text-aux-text">{{ $guestMember?->display_name }}</div>
+                    <div class="font-medium text-sm text-aux-muted">Guest</div>
+                </div>
 
-            <div class="mt-3 space-y-1">
-                <x-responsive-nav-link :href="route('profile')" wire:navigate>
-                    {{ __('Profile') }}
-                </x-responsive-nav-link>
+                <div class="mt-3 space-y-1">
+                    <button wire:click="leaveRoom" class="w-full text-start">
+                        <x-responsive-nav-link>
+                            Leave room
+                        </x-responsive-nav-link>
+                    </button>
+                </div>
+            @else
+                <div class="px-4">
+                    <div class="font-medium text-base text-aux-text" x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
+                    <div class="font-medium text-sm text-aux-muted">{{ auth()->user()->email }}</div>
+                </div>
 
-                <!-- Authentication -->
-                <button wire:click="logout" class="w-full text-start">
-                    <x-responsive-nav-link>
-                        {{ __('Log Out') }}
+                <div class="mt-3 space-y-1">
+                    <x-responsive-nav-link :href="route('profile')" wire:navigate>
+                        {{ __('Profile') }}
                     </x-responsive-nav-link>
-                </button>
-            </div>
+
+                    <!-- Authentication -->
+                    <button wire:click="logout" class="w-full text-start">
+                        <x-responsive-nav-link>
+                            {{ __('Log Out') }}
+                        </x-responsive-nav-link>
+                    </button>
+                </div>
+            @endif
         </div>
     </div>
 </nav>

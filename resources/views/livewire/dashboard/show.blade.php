@@ -16,48 +16,10 @@
 
 @else
 
-    {{-- Guests aren't authenticated, so they don't get the shared app navbar
-         (it assumes auth()->user()) — this is their own minimal equivalent. --}}
+    {{-- Guests aren't authenticated, so the shared nav (which normally reads
+         auth()->user()) is given this room/member explicitly instead. --}}
     @unless ($this->isHost)
-        <nav class="bg-aux-sidebar border-b border-aux-border">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex">
-                        <div class="shrink-0 flex items-center text-aux-text">
-                            <x-logo class="h-6" />
-                        </div>
-
-                        <div class="hidden lg:flex items-center space-x-8 sm:ms-10">
-                            <button wire:click="setTab('queue')"
-                                    class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium {{ $activeTab === 'queue' ? 'border-aux-accent text-aux-text' : 'border-transparent text-aux-muted hover:text-aux-text hover:border-aux-border' }}">
-                                Now Playing
-                            </button>
-                            <button wire:click="setTab('guests')"
-                                    class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium {{ $activeTab === 'guests' ? 'border-aux-accent text-aux-text' : 'border-transparent text-aux-muted hover:text-aux-text hover:border-aux-border' }}">
-                                Guests
-                            </button>
-                            <a href="{{ route('rooms.party', $room) }}" target="_blank"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-aux-muted hover:text-aux-text hover:border-aux-border">
-                                Party Screen
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="hidden lg:flex items-center gap-4">
-                        <span class="text-sm text-aux-muted">{{ $this->member->display_name }}</span>
-                        <button wire:click="leaveRoom" class="text-sm text-aux-muted hover:text-aux-text">Leave</button>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Mobile tab strip --}}
-            <div class="flex lg:hidden items-center gap-1 px-3 py-2 border-t border-aux-border overflow-x-auto text-xs">
-                <button wire:key="m-nav-queue" wire:click="setTab('queue')" class="shrink-0 px-3 py-1.5 rounded-full {{ $activeTab === 'queue' ? 'bg-aux-card-hover text-aux-accent' : 'text-aux-muted' }}">Now Playing</button>
-                <button wire:key="m-nav-guests" wire:click="setTab('guests')" class="shrink-0 px-3 py-1.5 rounded-full {{ $activeTab === 'guests' ? 'bg-aux-card-hover text-aux-accent' : 'text-aux-muted' }}">Guests</button>
-                <a wire:key="m-nav-party" href="{{ route('rooms.party', $room) }}" target="_blank" class="shrink-0 px-3 py-1.5 rounded-full text-aux-muted">Party</a>
-                <button wire:key="m-nav-leave" wire:click="leaveRoom" class="shrink-0 px-3 py-1.5 rounded-full text-aux-muted">Leave</button>
-            </div>
-        </nav>
+        <livewire:layout.navigation :room="$room" :member-id="$memberId" />
     @endunless
 
     <div class="flex-1 flex flex-col min-w-0">
@@ -97,7 +59,7 @@
 
             @if ($activeTab === 'hub' && $this->isHost)
                 @include('livewire.dashboard.tabs.hub')
-            @elseif ($activeTab === 'guests')
+            @elseif ($activeTab === 'guests' && $this->isHost)
                 @include('livewire.dashboard.tabs.guests')
             @else
                 @include('livewire.dashboard.tabs.queue')
