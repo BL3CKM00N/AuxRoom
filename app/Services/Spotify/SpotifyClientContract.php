@@ -18,11 +18,11 @@ interface SpotifyClientContract
 
     public function resume(?string $deviceId): bool;
 
-    public function pause(): bool;
+    public function pause(?string $deviceId = null): bool;
 
-    public function seek(int $positionMs): bool;
+    public function seek(int $positionMs, ?string $deviceId = null): bool;
 
-    public function setVolume(int $percent): bool;
+    public function setVolume(int $percent, ?string $deviceId = null): bool;
 
     /**
      * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}>

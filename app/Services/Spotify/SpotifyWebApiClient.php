@@ -42,6 +42,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
         $response = $this->http()->get('https://api.spotify.com/v1/me/player/devices');
 
         if ($response->failed()) {
+            Log::warning('Spotify device listing failed', ['status' => $response->status(), 'body' => $response->body()]);
+
             return [];
         }
 
@@ -70,23 +72,42 @@ class SpotifyWebApiClient implements SpotifyClientContract
         return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, []);
     }
 
-    public function pause(): bool
+    public function pause(?string $deviceId = null): bool
     {
-        return $this->http()->put('https://api.spotify.com/v1/me/player/pause')->successful();
+        $query = $deviceId ? ['device_id' => $deviceId] : [];
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/pause', $query, []);
     }
 
-    public function seek(int $positionMs): bool
+    /**
+     * Spotify's seek endpoint takes position_ms as a query parameter, not a
+     * request body field — sending it as JSON body (the previous bug here)
+     * gets silently ignored, so the seek never actually happens.
+     */
+    public function seek(int $positionMs, ?string $deviceId = null): bool
     {
-        return $this->http()->put('https://api.spotify.com/v1/me/player/seek', [
-            'position_ms' => $positionMs,
-        ])->successful();
+        $query = ['position_ms' => $positionMs];
+
+        if ($deviceId) {
+            $query['device_id'] = $deviceId;
+        }
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/seek', $query, []);
     }
 
-    public function setVolume(int $percent): bool
+    /**
+     * Same as seek() — volume_percent belongs in the query string, not the
+     * request body.
+     */
+    public function setVolume(int $percent, ?string $deviceId = null): bool
     {
-        return $this->http()->put('https://api.spotify.com/v1/me/player/volume', [
-            'volume_percent' => max(0, min(100, $percent)),
-        ])->successful();
+        $query = ['volume_percent' => max(0, min(100, $percent))];
+
+        if ($deviceId) {
+            $query['device_id'] = $deviceId;
+        }
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/volume', $query, []);
     }
 
     public function searchPlaylists(string $query, int $limit = 8): array
@@ -150,7 +171,13 @@ class SpotifyWebApiClient implements SpotifyClientContract
     {
         $response = $this->http()->get('https://api.spotify.com/v1/me/player');
 
-        if ($response->status() === 204 || $response->failed()) {
+        if ($response->status() === 204) {
+            return null;
+        }
+
+        if ($response->failed()) {
+            Log::warning('Spotify playback state fetch failed', ['status' => $response->status(), 'body' => $response->body()]);
+
             return null;
         }
 
@@ -199,7 +226,17 @@ class SpotifyWebApiClient implements SpotifyClientContract
             $url .= '?'.http_build_query($query);
         }
 
-        return $request->put($url, $body)->successful();
+        $response = $request->put($url, $body);
+
+        if ($response->failed()) {
+            Log::warning('Spotify playback command failed', [
+                'url' => $url,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+        }
+
+        return $response->successful();
     }
 
     private function http(): PendingRequest

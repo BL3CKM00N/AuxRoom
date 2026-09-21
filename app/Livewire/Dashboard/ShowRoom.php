@@ -585,7 +585,7 @@ class ShowRoom extends Component
 
         $position = $this->room->currentPositionMs();
 
-        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->pause()) {
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->pause($this->providerDeviceId())) {
             $this->controlError = "Spotify couldn't pause playback.";
 
             return;
@@ -621,7 +621,7 @@ class ShowRoom extends Component
             return;
         }
 
-        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms)) {
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms, $this->providerDeviceId())) {
             $this->controlError = "Spotify couldn't seek playback.";
 
             return;
@@ -643,7 +643,7 @@ class ShowRoom extends Component
 
         $percent = max(0, min(100, $percent));
 
-        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent)) {
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent, $this->providerDeviceId())) {
             $this->controlError = "Spotify couldn't change the volume.";
 
             return;

@@ -1,4 +1,4 @@
-<div wire:poll.5s="heartbeat" x-data="roomLocation()" x-init="init()" class="min-h-screen flex flex-col bg-aux-bg text-aux-text">
+<div wire:poll.3s="heartbeat" x-data="roomLocation()" x-init="init()" class="min-h-screen flex flex-col bg-aux-bg text-aux-text">
 
 @if (! $this->isApproved)
 

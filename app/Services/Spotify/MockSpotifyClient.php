@@ -34,17 +34,17 @@ class MockSpotifyClient implements SpotifyClientContract
         return true;
     }
 
-    public function pause(): bool
+    public function pause(?string $deviceId = null): bool
     {
         return true;
     }
 
-    public function seek(int $positionMs): bool
+    public function seek(int $positionMs, ?string $deviceId = null): bool
     {
         return true;
     }
 
-    public function setVolume(int $percent): bool
+    public function setVolume(int $percent, ?string $deviceId = null): bool
     {
         return true;
     }
