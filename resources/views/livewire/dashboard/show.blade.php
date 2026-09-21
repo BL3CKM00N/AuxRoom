@@ -125,7 +125,10 @@
 
         <div class="flex-1 flex flex-col items-center gap-1 min-w-0">
             <div class="flex items-center gap-4">
-                <button disabled class="text-aux-faint opacity-40 cursor-default"><x-icon name="shuffle" class="w-4 h-4" /></button>
+                <button wire:click="toggleShuffle" @disabled(! $this->canGuest('guests_can_play_pause'))
+                        class="disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
+                    <x-icon name="shuffle" class="w-4 h-4" />
+                </button>
                 <button wire:click="previous" @disabled((! $this->nowPlaying && ! $room->is_playing_fallback) || ! $this->canGuest('guests_can_skip'))
                         class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
                     <x-icon name="back" class="w-4 h-4" />
@@ -144,7 +147,13 @@
                 <button wire:click="skip" @disabled((! $this->nowPlaying && ! $room->is_playing_fallback) || ! $this->canGuest('guests_can_skip')) class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
                     <x-icon name="skip" class="w-4 h-4" />
                 </button>
-                <button disabled class="text-aux-faint opacity-40 cursor-default"><x-icon name="repeat" class="w-4 h-4" /></button>
+                <button wire:click="toggleRepeat" @disabled(! $this->canGuest('guests_can_play_pause'))
+                        class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->repeat_mode !== 'off' ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
+                    <x-icon name="repeat" class="w-4 h-4" />
+                    @if ($room->repeat_mode === 'track')
+                        <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black text-[8px] font-bold flex items-center justify-center">1</span>
+                    @endif
+                </button>
             </div>
             <div class="w-full max-w-md flex items-center gap-2 text-[10px] text-aux-faint"
                  x-data="playbackClock()"
@@ -156,8 +165,8 @@
                        @mousedown="dragging = true" @touchstart="dragging = true"
                        @mouseup="dragging = false" @touchend="dragging = false"
                        @input="positionMs = Number($event.target.value)"
-                       :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%)`"
-                       wire:change="seek($event.target.value)" class="flex-1 disabled:opacity-30">
+                       :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%); background-clip: content-box;`"
+                       wire:change="seek($event.target.value)" class="seek-bar flex-1 disabled:opacity-30">
                 <span x-text="formatMs(durationMs)"></span>
             </div>
         </div>

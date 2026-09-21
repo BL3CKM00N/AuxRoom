@@ -44,6 +44,18 @@ input[type='range']:disabled {
     cursor: not-allowed;
 }
 
+/* The seek/progress bars get a much taller click-and-drag hit area than
+   the default slider, via padding rather than height — background-clip
+   keeps the visible colored bar confined to the original thin content
+   box, so the padding area is clickable but invisible. Firefox's track
+   is unaffected either way since -moz-range-track/-progress declare
+   their own explicit height regardless of the input's box size. */
+input[type='range'].seek-bar {
+    box-sizing: content-box;
+    padding: 10px 0;
+    background-clip: content-box;
+}
+
 /* Homepage aurora background — a few large, blurred green glows drifting
    slowly behind the content, before any interaction happens. */
 .aurora {
