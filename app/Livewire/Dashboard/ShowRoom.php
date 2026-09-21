@@ -637,18 +637,12 @@ class ShowRoom extends Component
                 return;
             }
 
-            // Bare resume only fails when Spotify has genuinely dropped the
-            // paused state (e.g. after a long gap) — fall back to an
-            // explicit restart in that case.
-            if ($this->room->is_playing_fallback && $this->room->fallback_playlist_uri) {
-                if ($this->startFallbackPlayback()) {
-                    $this->syncWithSpotify();
-                    $this->broadcastUpdate('playback');
-                }
-
-                return;
-            }
-
+            // Bare resume can fail (Spotify drops the paused state often
+            // enough in practice) — fall back to resuming this exact track
+            // at its exact position. Restarting the fallback playlist's
+            // context instead (the previous approach here) always forced
+            // shuffle back on and picked a new random track, which is
+            // exactly the "skips to next track" bug this replaces.
             if (! $this->playTrackAt(
                 $this->room->now_playing_track_id,
                 $this->room->now_playing_name ?? 'Unknown track',
