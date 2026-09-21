@@ -1,0 +1,40 @@
+@props(['name'])
+@php
+$paths = [
+    'grid' => '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    'queue-list' => '<path d="M3 6h13M3 12h13M3 18h9" stroke-linecap="round"/><circle cx="19" cy="18" r="2"/><path d="M19 6v10" stroke-linecap="round"/>',
+    'users' => '<circle cx="9" cy="7" r="3"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke-linecap="round"/><path d="M16 4.5c1.7.3 3 1.8 3 3.5s-1.3 3.2-3 3.5" stroke-linecap="round"/><path d="M19 14.5c1.8.6 3 2.2 3 4.5" stroke-linecap="round"/>',
+    'tv' => '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8" stroke-linecap="round"/>',
+    'cog' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 000-2l2-1.6-2-3.4-2.4.7a8 8 0 00-1.7-1L14.8 3h-3.6l-.5 2.7a8 8 0 00-1.7 1l-2.4-.7-2 3.4L6.6 11a7.9 7.9 0 000 2l-2 1.6 2 3.4 2.4-.7a8 8 0 001.7 1l.5 2.7h3.6l.5-2.7a8 8 0 001.7-1l2.4.7 2-3.4z" stroke-linejoin="round"/>',
+    'speaker' => '<rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="15" r="3.2"/><circle cx="12" cy="7" r="1"/>',
+    'user-group' => '<circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke-linecap="round"/><path d="M14.5 15c2.6.4 4.5 2.2 4.5 5" stroke-linecap="round"/>',
+    'map-pin' => '<path d="M12 21s7-6.1 7-11.5A7 7 0 105 9.5C5 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/>',
+    'lock' => '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 118 0v3" stroke-linecap="round"/>',
+    'shield' => '<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3z" stroke-linejoin="round"/>',
+    'clock' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2" stroke-linecap="round"/>',
+    'download' => '<path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/>',
+    'qr' => '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14v3M14 19h3M19 19h2v2h-2z"/>',
+    'copy' => '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
+    'x-mark' => '<path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>',
+    'search' => '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4" stroke-linecap="round"/>',
+    'refresh' => '<path d="M4 4v5h5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-5h-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 9a7 7 0 0112-3.5L20 8M4 16l2.5 2.5A7 7 0 0018.5 15" stroke-linecap="round"/>',
+    'plus' => '<path d="M12 5v14M5 12h14" stroke-linecap="round"/>',
+    'play' => '<path d="M7 4.5v15l13-7.5z" stroke-linejoin="round"/>',
+    'pause' => '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+    'skip' => '<path d="M6 5v14l10-7z" stroke-linejoin="round"/><rect x="17" y="5" width="2" height="14" rx="0.5"/>',
+    'back' => '<path d="M18 5v14L8 12z" stroke-linejoin="round"/><rect x="5" y="5" width="2" height="14" rx="0.5"/>',
+    'shuffle' => '<path d="M4 6h3.5L16 18h4M4 18h3.5L11 13M17 6h3v3M20 6l-4.5 4.5M17 18h3v-3M20 18l-4-4" stroke-linecap="round" stroke-linejoin="round"/>',
+    'repeat' => '<path d="M4 7h13a3 3 0 013 3v2M20 17H7a3 3 0 01-3-3v-2" stroke-linecap="round"/><path d="M7 4L4 7l3 3M17 20l3-3-3-3" stroke-linecap="round" stroke-linejoin="round"/>',
+    'volume' => '<path d="M4 9v6h4l5 4V5L8 9H4z" stroke-linejoin="round"/><path d="M17 8a5 5 0 010 8" stroke-linecap="round"/>',
+    'device' => '<rect x="4" y="4" width="16" height="10" rx="2"/><path d="M9 20h6M12 14v6" stroke-linecap="round"/>',
+    'exit' => '<path d="M9 5H5v14h4M13 12h8m0 0l-3-3m3 3l-3 3" stroke-linecap="round" stroke-linejoin="round"/>',
+    'expand' => '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke-linecap="round" stroke-linejoin="round"/>',
+    'chevron-right' => '<path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>',
+    'chevron-up-down' => '<path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>',
+    'note' => '<path d="M9 18V5l10-2v12" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="15" r="2.5"/>',
+    'zap' => '<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke-linejoin="round"/>',
+    'link-out' => '<path d="M14 5h5v5M19 5l-9 9M6 5H5v14h14v-1" stroke-linecap="round" stroke-linejoin="round"/>',
+];
+$svg = $paths[$name] ?? $paths['grid'];
+@endphp
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" {{ $attributes->merge(['class' => 'w-4 h-4']) }}>{!! $svg !!}</svg>

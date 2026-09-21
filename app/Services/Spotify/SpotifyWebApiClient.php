@@ -1,0 +1,191 @@
+<?php
+
+namespace App\Services\Spotify;
+
+use App\Models\SpotifyAccount;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class SpotifyWebApiClient implements SpotifyClientContract
+{
+    public function __construct(private SpotifyAccount $account) {}
+
+    public function search(string $query, int $limit = 10): array
+    {
+        $response = $this->http()->get('https://api.spotify.com/v1/search', [
+            'q' => $query,
+            'type' => 'track',
+            'limit' => $limit,
+        ]);
+
+        if ($response->failed()) {
+            Log::warning('Spotify search failed', ['status' => $response->status(), 'body' => $response->body()]);
+
+            return [];
+        }
+
+        $tracks = $response->json('tracks.items', []);
+
+        return collect($tracks)->map(fn (array $track) => [
+            'id' => $track['id'],
+            'uri' => $track['uri'],
+            'name' => $track['name'],
+            'artist' => collect($track['artists'] ?? [])->pluck('name')->join(', '),
+            'album_art_url' => $track['album']['images'][0]['url'] ?? null,
+            'duration_ms' => $track['duration_ms'],
+        ])->all();
+    }
+
+    public function getDevices(): array
+    {
+        $response = $this->http()->get('https://api.spotify.com/v1/me/player/devices');
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        return collect($response->json('devices', []))->map(fn (array $device) => [
+            'id' => $device['id'],
+            'name' => $device['name'],
+            'type' => $device['type'],
+            'is_active' => $device['is_active'],
+        ])->all();
+    }
+
+    public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool
+    {
+        $query = $deviceId ? ['device_id' => $deviceId] : [];
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, [
+            'uris' => [$trackUri],
+            'position_ms' => $positionMs,
+        ]);
+    }
+
+    public function resume(?string $deviceId): bool
+    {
+        $query = $deviceId ? ['device_id' => $deviceId] : [];
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, []);
+    }
+
+    public function pause(): bool
+    {
+        return $this->http()->put('https://api.spotify.com/v1/me/player/pause')->successful();
+    }
+
+    public function seek(int $positionMs): bool
+    {
+        return $this->http()->put('https://api.spotify.com/v1/me/player/seek', [
+            'position_ms' => $positionMs,
+        ])->successful();
+    }
+
+    public function setVolume(int $percent): bool
+    {
+        return $this->http()->put('https://api.spotify.com/v1/me/player/volume', [
+            'volume_percent' => max(0, min(100, $percent)),
+        ])->successful();
+    }
+
+    public function searchPlaylists(string $query, int $limit = 8): array
+    {
+        $response = $this->http()->get('https://api.spotify.com/v1/search', [
+            'q' => $query,
+            'type' => 'playlist',
+            'limit' => $limit,
+        ]);
+
+        if ($response->failed()) {
+            Log::warning('Spotify playlist search failed', ['status' => $response->status(), 'body' => $response->body()]);
+
+            return [];
+        }
+
+        return $this->mapPlaylists($response->json('playlists.items', []));
+    }
+
+    public function myPlaylists(int $limit = 50): array
+    {
+        $response = $this->http()->get('https://api.spotify.com/v1/me/playlists', [
+            'limit' => $limit,
+        ]);
+
+        if ($response->failed()) {
+            Log::warning('Spotify playlist listing failed', ['status' => $response->status(), 'body' => $response->body()]);
+
+            return [];
+        }
+
+        return $this->mapPlaylists($response->json('items', []));
+    }
+
+    public function getPlaylist(string $id): ?array
+    {
+        $response = $this->http()->get("https://api.spotify.com/v1/playlists/{$id}");
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        return $this->mapPlaylist($response->json());
+    }
+
+    public function playContext(string $contextUri, ?string $deviceId, bool $shuffle = true): bool
+    {
+        $query = $deviceId ? ['device_id' => $deviceId] : [];
+
+        $this->putWithQuery('https://api.spotify.com/v1/me/player/shuffle', [
+            ...$query,
+            'state' => $shuffle ? 'true' : 'false',
+        ], []);
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, [
+            'context_uri' => $contextUri,
+        ]);
+    }
+
+    /**
+     * @return array<int, array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}>
+     */
+    private function mapPlaylists(array $playlists): array
+    {
+        return collect($playlists)->filter()->map(fn (array $playlist) => $this->mapPlaylist($playlist))->values()->all();
+    }
+
+    /**
+     * @return array{id: string, uri: string, name: string, owner: ?string, image_url: ?string, track_count: int}
+     */
+    private function mapPlaylist(array $playlist): array
+    {
+        return [
+            'id' => $playlist['id'],
+            'uri' => $playlist['uri'],
+            'name' => $playlist['name'],
+            'owner' => $playlist['owner']['display_name'] ?? null,
+            'image_url' => $playlist['images'][0]['url'] ?? null,
+            'track_count' => $playlist['tracks']['total'] ?? 0,
+        ];
+    }
+
+    private function putWithQuery(string $url, array $query, array $body): bool
+    {
+        $request = $this->http()->asJson();
+
+        if (! empty($query)) {
+            $url .= '?'.http_build_query($query);
+        }
+
+        return $request->put($url, $body)->successful();
+    }
+
+    private function http(): PendingRequest
+    {
+        app(SpotifyTokenManager::class)->ensureFreshToken($this->account);
+
+        return Http::withToken($this->account->access_token)
+            ->acceptJson()
+            ->timeout(10);
+    }
+}

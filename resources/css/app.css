@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none !important;
+}
+
+html {
+    background-color: #0a0d12;
+}
+
+body {
+    background-color: #0a0d12;
+    color: #f5f7fa;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+}
+
+input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 9999px;
+    /* Unfilled color; the filled (green) portion is painted by an inline
+       linear-gradient background set per-slider based on its current value. */
+    background: rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+}
+
+input[type='range']:disabled {
+    cursor: not-allowed;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: transparent;
+}
+
+input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -5px;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: #22c55e;
+}
+
+input[type='range']::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+input[type='range']::-moz-range-progress {
+    height: 4px;
+    border-radius: 9999px;
+    background: #22c55e;
+}
+
+input[type='range']::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 9999px;
+    background: #22c55e;
+}

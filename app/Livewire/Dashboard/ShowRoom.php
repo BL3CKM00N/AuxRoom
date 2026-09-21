@@ -1,0 +1,985 @@
+<?php
+
+namespace App\Livewire\Dashboard;
+
+use App\Events\RoomUpdated;
+use App\Livewire\Actions\Logout;
+use App\Models\ActivityEvent;
+use App\Models\QueueItem;
+use App\Models\Room;
+use App\Models\RoomMember;
+use App\Services\RoomMembership;
+use App\Services\Spotify\SpotifyClientFactory;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+
+class ShowRoom extends Component
+{
+    public Room $room;
+
+    public int $memberId;
+
+    public string $search = '';
+
+    /** @var array<int, array> */
+    public array $searchResults = [];
+
+    public string $playlistQuery = '';
+
+    /** @var array<int, array> */
+    public array $playlistResults = [];
+
+    public string $controlError = '';
+
+    #[Url(as: 'tab')]
+    public string $activeTab = 'hub';
+
+    public string $editRoomName = '';
+
+    public int $editRadius = 250;
+
+    public ?string $confirmAction = null;
+
+    /** @var array<int, mixed> */
+    public array $confirmParams = [];
+
+    public string $confirmMessage = '';
+
+    public string $confirmLabel = 'Confirm';
+
+    public bool $confirmDanger = true;
+
+    public function mount(RoomMembership $membership, ?Room $room = null): void
+    {
+        if (! $room) {
+            $room = request()->user()?->activeHostedRoom();
+
+            if (! $room) {
+                $this->redirect(route('rooms.create'));
+
+                return;
+            }
+        }
+
+        $this->room = $room;
+
+        if ($room->closed_at) {
+            abort(404);
+        }
+
+        $found = $membership->resolve($room, request());
+
+        if (! $found) {
+            if (request()->user() && request()->user()->id === $room->host_id) {
+                $found = $membership->joinAsHost($room);
+            } else {
+                $this->redirect(route('join', ['code' => $room->invite_code]));
+
+                return;
+            }
+        }
+
+        $found->update(['last_seen_at' => now()]);
+        $this->memberId = $found->id;
+        $this->editRoomName = $room->name;
+        $this->editRadius = $room->location_radius_m ?? 250;
+
+        if (! request()->has('tab')) {
+            $this->activeTab = $found->isHost() ? 'hub' : 'queue';
+        }
+    }
+
+    public function setTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+    }
+
+    public function saveRoomDetails(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $validated = $this->validate([
+            'editRoomName' => ['required', 'string', 'max:255'],
+            'editRadius' => ['required', 'integer', 'min:10', 'max:5000'],
+        ]);
+
+        $nameChanged = $validated['editRoomName'] !== $this->room->name;
+        $radiusChanged = $validated['editRadius'] !== $this->room->location_radius_m;
+
+        $this->room->update([
+            'name' => $validated['editRoomName'],
+            'location_radius_m' => $validated['editRadius'],
+        ]);
+
+        if ($nameChanged) {
+            $this->logActivity('settings', "Room renamed to \"{$validated['editRoomName']}\".");
+        }
+
+        if ($radiusChanged) {
+            $this->logActivity('settings', "Location radius set to {$validated['editRadius']}m.");
+        }
+
+        $this->broadcastUpdate('settings');
+    }
+
+    /**
+     * Ask the user to confirm a destructive action via the in-app modal,
+     * instead of the browser's native confirm() dialog.
+     */
+    public function requestConfirm(string $action, array $params = [], string $message = '', string $label = 'Confirm', bool $danger = true): void
+    {
+        $this->confirmAction = $action;
+        $this->confirmParams = $params;
+        $this->confirmMessage = $message;
+        $this->confirmLabel = $label;
+        $this->confirmDanger = $danger;
+    }
+
+    public function confirmYes(): mixed
+    {
+        $action = $this->confirmAction;
+        $params = $this->confirmParams;
+
+        $this->confirmAction = null;
+        $this->confirmParams = [];
+        $this->confirmMessage = '';
+
+        if ($action && method_exists($this, $action)) {
+            return $this->{$action}(...$params);
+        }
+
+        return null;
+    }
+
+    public function confirmNo(): void
+    {
+        $this->confirmAction = null;
+        $this->confirmParams = [];
+        $this->confirmMessage = '';
+    }
+
+    #[On('echo:room.{room.invite_code},RoomUpdated')]
+    public function onRoomUpdated(): mixed
+    {
+        return $this->redirectIfRemoved();
+    }
+
+    public function heartbeat(): mixed
+    {
+        if ($redirect = $this->redirectIfRemoved()) {
+            return $redirect;
+        }
+
+        $this->member->update(['last_seen_at' => now()]);
+        $this->autoAdvanceIfNeeded();
+
+        return null;
+    }
+
+    /**
+     * If the host removed this visitor since their last request, bounce them
+     * out immediately instead of leaving them stranded until a manual refresh.
+     */
+    private function redirectIfRemoved(): mixed
+    {
+        if (Room::whereKey($this->room->id)->whereNotNull('closed_at')->exists()) {
+            session()->flash('status', 'This room has been closed.');
+
+            return $this->redirect($this->isHost ? route('dashboard') : route('join'));
+        }
+
+        if ($this->member->left_at !== null) {
+            session()->flash('status', 'You were removed from this room.');
+
+            return $this->redirect(route('join', ['code' => $this->room->invite_code]));
+        }
+
+        return null;
+    }
+
+    public function getMemberProperty(): RoomMember
+    {
+        return RoomMember::findOrFail($this->memberId);
+    }
+
+    public function getIsHostProperty(): bool
+    {
+        return $this->member->isHost();
+    }
+
+    public function getMembersProperty()
+    {
+        return $this->room->activeMembers()
+            ->where(fn ($q) => $q->where('role', 'host')->orWhereNotNull('approved_at'))
+            ->with('user.spotifyAccount')
+            ->orderByDesc('role')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function getPendingMembersProperty()
+    {
+        return $this->room->pendingMembers()->orderBy('id')->get();
+    }
+
+    public function getIsApprovedProperty(): bool
+    {
+        return $this->member->isApproved();
+    }
+
+    /** Maps the ability keys used throughout the app to their per-guest column. */
+    private const ABILITY_COLUMNS = [
+        'guests_can_play_pause' => 'can_play_pause',
+        'guests_can_skip' => 'can_skip',
+        'guests_can_seek' => 'can_seek',
+        'guests_can_set_volume' => 'can_set_volume',
+        'guests_can_manage_playlist' => 'can_manage_playlist',
+    ];
+
+    /**
+     * Whether the current visitor is allowed to use a given control — used to
+     * visually gray out buttons for guests, mirroring the server-side gate.
+     * Add-to-queue stays a single room-wide switch (it's what the emergency
+     * stop needs: one instant lock for everyone). Everything else is per-guest.
+     */
+    public function canGuest(string $ability): bool
+    {
+        if ($this->isHost) {
+            return true;
+        }
+
+        if ($ability === 'guests_can_add_to_queue') {
+            return (bool) $this->room->guests_can_add_to_queue;
+        }
+
+        return (bool) $this->member->{self::ABILITY_COLUMNS[$ability]};
+    }
+
+    public function getOnlineCountProperty(): int
+    {
+        return $this->members->filter(fn (RoomMember $m) => $m->isOnline())->count();
+    }
+
+    public function getQueueProperty()
+    {
+        return $this->room->pendingQueueItems()->with('addedBy')->get();
+    }
+
+    public function getActivityProperty()
+    {
+        return $this->room->activityEvents()->latest()->limit(30)->get();
+    }
+
+    public function getNowPlayingProperty(): ?QueueItem
+    {
+        return $this->room->nowPlaying;
+    }
+
+    public function getCurrentPositionMsProperty(): int
+    {
+        return $this->room->currentPositionMs();
+    }
+
+    public function getIsMockProperty(): bool
+    {
+        return app(SpotifyClientFactory::class)->isMock($this->room);
+    }
+
+    public function getEligibleProvidersProperty()
+    {
+        return $this->room->members()
+            ->whereNotNull('user_id')
+            ->whereHas('user.spotifyAccount', fn ($q) => $q->whereNotNull('access_token'))
+            ->with('user.spotifyAccount')
+            ->get()
+            ->unique('user_id');
+    }
+
+    public function getDevicesProperty(): array
+    {
+        if ($this->isMock) {
+            return app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices();
+        }
+
+        if (! $this->room->playbackProvider?->hasSpotifyConnected()) {
+            return [];
+        }
+
+        return app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices();
+    }
+
+    public function updatedSearch(): void
+    {
+        if (trim($this->search) !== '') {
+            $this->activeTab = 'queue';
+        }
+
+        $this->search();
+    }
+
+    public function search(): void
+    {
+        $this->controlError = '';
+
+        if (trim($this->search) === '') {
+            $this->searchResults = [];
+
+            return;
+        }
+
+        $this->searchResults = app(SpotifyClientFactory::class)->forRoom($this->room)->search($this->search, 8);
+    }
+
+    public function addToQueue(int $index): void
+    {
+        if (! $this->passesGate('guests_can_add_to_queue')) {
+            return;
+        }
+
+        $track = $this->searchResults[$index] ?? null;
+
+        if (! $track) {
+            return;
+        }
+
+        $nextPosition = (int) ($this->room->queueItems()->max('position') ?? 0) + 1;
+
+        $item = $this->room->queueItems()->create([
+            'added_by_id' => $this->member->id,
+            'spotify_track_id' => $track['id'],
+            'name' => $track['name'],
+            'artist' => $track['artist'],
+            'album_art_url' => $track['album_art_url'],
+            'duration_ms' => $track['duration_ms'],
+            'position' => $nextPosition,
+        ]);
+
+        $this->logActivity('queued', "{$this->member->display_name} added \"{$item->name}\" to the queue.");
+
+        // A guest pick always wins over the fallback playlist — interrupt it
+        // immediately rather than waiting for it to (never) run out on its own.
+        if ($this->room->is_playing_fallback || (! $this->room->now_playing_queue_item_id && ! $this->room->is_playing)) {
+            $this->startPlayback($item);
+        }
+
+        $this->broadcastUpdate('queue');
+
+        $this->search = '';
+        $this->searchResults = [];
+    }
+
+    public function updatedPlaylistQuery(): void
+    {
+        $this->searchPlaylists();
+    }
+
+    public function searchPlaylists(): void
+    {
+        if (! $this->passesGate('guests_can_manage_playlist')) {
+            $this->playlistResults = [];
+
+            return;
+        }
+
+        $query = trim($this->playlistQuery);
+
+        if ($query === '') {
+            $this->playlistResults = [];
+
+            return;
+        }
+
+        $client = app(SpotifyClientFactory::class)->forRoom($this->room);
+
+        // A pasted playlist link resolves directly instead of going through search.
+        if ($id = $this->parsePlaylistId($query)) {
+            $playlist = $client->getPlaylist($id);
+            $this->playlistResults = $playlist ? [$playlist] : [];
+
+            return;
+        }
+
+        $this->playlistResults = $client->searchPlaylists($query, 8);
+    }
+
+    public function browseMyPlaylists(): void
+    {
+        if (! $this->passesGate('guests_can_manage_playlist')) {
+            return;
+        }
+
+        $this->playlistQuery = '';
+        $this->playlistResults = app(SpotifyClientFactory::class)->forRoom($this->room)->myPlaylists();
+    }
+
+    public function selectFallbackPlaylist(int $index): void
+    {
+        if (! $this->passesGate('guests_can_manage_playlist')) {
+            return;
+        }
+
+        $playlist = $this->playlistResults[$index] ?? null;
+
+        if (! $playlist) {
+            return;
+        }
+
+        $this->room->update([
+            'fallback_playlist_uri' => $playlist['uri'],
+            'fallback_playlist_name' => $playlist['name'],
+            'fallback_playlist_image_url' => $playlist['image_url'],
+        ]);
+
+        $this->playlistQuery = '';
+        $this->playlistResults = [];
+
+        $this->logActivity('settings', "{$this->member->display_name} set the fallback playlist to \"{$playlist['name']}\".");
+        $this->broadcastUpdate('settings');
+    }
+
+    public function clearFallbackPlaylist(): void
+    {
+        if (! $this->passesGate('guests_can_manage_playlist')) {
+            return;
+        }
+
+        $this->room->update([
+            'fallback_playlist_uri' => null,
+            'fallback_playlist_name' => null,
+            'fallback_playlist_image_url' => null,
+            'is_playing_fallback' => false,
+        ]);
+
+        $this->logActivity('settings', "{$this->member->display_name} removed the fallback playlist.");
+        $this->broadcastUpdate('settings');
+    }
+
+    /** Pulls a bare playlist ID out of a pasted Spotify link or URI, if it looks like one. */
+    private function parsePlaylistId(string $input): ?string
+    {
+        if (preg_match('#playlist[/:]([A-Za-z0-9]{10,30})#', trim($input), $matches)) {
+            return $matches[1];
+        }
+
+        return null;
+    }
+
+    public function play(): void
+    {
+        if (! $this->passesGate('guests_can_play_pause')) {
+            return;
+        }
+
+        if ($this->room->now_playing_queue_item_id && ! $this->room->is_playing) {
+            $item = $this->room->nowPlaying;
+            $client = app(SpotifyClientFactory::class)->forRoom($this->room);
+            $client->resume($this->providerDeviceId());
+
+            $this->room->update([
+                'is_playing' => true,
+                'now_playing_started_at' => now()->subMilliseconds($this->room->now_playing_position_ms),
+            ]);
+
+            $this->logActivity('played', "Playback resumed: \"{$item?->name}\".");
+            $this->broadcastUpdate('playback');
+
+            return;
+        }
+
+        $next = $this->room->pendingQueueItems()->first();
+
+        if ($next) {
+            $this->startPlayback($next);
+            $this->broadcastUpdate('playback');
+
+            return;
+        }
+
+        if ($this->room->fallback_playlist_uri) {
+            $this->startFallbackPlayback();
+            $this->broadcastUpdate('playback');
+        }
+    }
+
+    public function pause(): void
+    {
+        if (! $this->passesGate('guests_can_play_pause')) {
+            return;
+        }
+
+        if (! $this->room->is_playing) {
+            return;
+        }
+
+        $position = $this->room->currentPositionMs();
+
+        app(SpotifyClientFactory::class)->forRoom($this->room)->pause();
+
+        $this->room->update([
+            'is_playing' => false,
+            'now_playing_position_ms' => $position,
+        ]);
+
+        $this->logActivity('paused', 'Playback paused.');
+        $this->broadcastUpdate('playback');
+    }
+
+    public function skip(): void
+    {
+        if (! $this->passesGate('guests_can_skip')) {
+            return;
+        }
+
+        $this->advanceQueue();
+        $this->logActivity('skipped', "{$this->member->display_name} skipped the track.");
+        $this->broadcastUpdate('playback');
+    }
+
+    public function seek(int $ms): void
+    {
+        if (! $this->passesGate('guests_can_seek')) {
+            return;
+        }
+
+        if (! $this->room->now_playing_queue_item_id) {
+            return;
+        }
+
+        app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms);
+
+        $this->room->update([
+            'now_playing_position_ms' => $ms,
+            'now_playing_started_at' => $this->room->is_playing ? now()->subMilliseconds($ms) : null,
+        ]);
+
+        $this->broadcastUpdate('playback');
+    }
+
+    public function setVolume(int $percent): void
+    {
+        if (! $this->passesGate('guests_can_set_volume')) {
+            return;
+        }
+
+        $percent = max(0, min(100, $percent));
+
+        app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent);
+        $this->room->update(['volume_percent' => $percent]);
+        $this->broadcastUpdate('playback');
+    }
+
+    public function switchProvider(int $userId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->room->update(['playback_provider_id' => $userId]);
+        $this->logActivity('device_changed', 'Playback source switched.');
+        $this->broadcastUpdate('settings');
+    }
+
+    public function selectDevice(string $deviceId, string $deviceName): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->room->playbackProvider?->spotifyAccount?->update([
+            'active_device_id' => $deviceId,
+            'active_device_name' => $deviceName,
+        ]);
+
+        $this->logActivity('device_changed', "Playback device set to \"{$deviceName}\".");
+        $this->broadcastUpdate('settings');
+    }
+
+    public function togglePrivate(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $isPrivate = ! $this->room->is_private;
+        $this->room->update(['is_private' => $isPrivate]);
+        $this->logActivity('settings', $isPrivate
+            ? 'Room set to private — new guests now need approval to join.'
+            : 'Room set to public — anyone with the code can join instantly.');
+        $this->broadcastUpdate('settings');
+    }
+
+    /**
+     * Set a single guest's permission for a single ability. Permissions are
+     * entirely per-guest — there's no room-wide default to fall back to
+     * (except add-to-queue, which the emergency stop can still lock for
+     * everyone at once).
+     */
+    public function setMemberPermission(int $memberId, string $ability, bool $allowed): void
+    {
+        if (! $this->isHost || ! array_key_exists($ability, self::ABILITY_COLUMNS)) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if (! $target || $target->isHost()) {
+            return;
+        }
+
+        $column = self::ABILITY_COLUMNS[$ability];
+        $target->update([$column => $allowed]);
+
+        $label = str($ability)->after('guests_can_')->replace('_', ' ')->toString();
+        $this->logActivity('permission_changed', "{$target->display_name} was ".($allowed ? 'allowed to ' : 'blocked from ')."{$label}.");
+        $this->broadcastUpdate('members');
+    }
+
+    /**
+     * The big red "stop the bleeding" button — instantly blocks every guest,
+     * including ones who join later, from adding to the queue, overriding
+     * their individual permission. This is the one deliberate exception to
+     * "no room-wide switches": an emergency needs a single, instant lock.
+     */
+    public function emergencyStopQueue(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->room->update(['guests_can_add_to_queue' => false]);
+        $this->logActivity('settings', 'Host locked the queue — no one can add songs right now.');
+        $this->broadcastUpdate('settings');
+    }
+
+    public function reopenQueue(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->room->update(['guests_can_add_to_queue' => true]);
+        $this->logActivity('settings', 'Host reopened the queue.');
+        $this->broadcastUpdate('settings');
+    }
+
+    public function toggleLocationEnforced(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $enabled = ! $this->room->location_enforced;
+        $this->room->update(['location_enforced' => $enabled]);
+        $this->logActivity('settings', $enabled
+            ? 'Location boundary enforcement turned on.'
+            : 'Location boundary enforcement turned off.');
+        $this->broadcastUpdate('settings');
+    }
+
+    public function setLocationBoundary(float $lat, float $lng, int $radius): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->room->update([
+            'location_lat' => $lat,
+            'location_lng' => $lng,
+            'location_radius_m' => $radius,
+        ]);
+
+        $this->logActivity('settings', 'Room location boundary updated.');
+        $this->broadcastUpdate('settings');
+    }
+
+    public function revokeAllAccess(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->room->members()->where('role', 'guest')->update(['left_at' => now()]);
+
+        do {
+            $code = Room::generateInviteCode();
+        } while (Room::where('invite_code', $code)->exists());
+
+        $this->room->update(['invite_code' => $code]);
+        $this->logActivity('access_revoked', 'Host revoked access for all guests.');
+        $this->redirect(route('dashboard'));
+    }
+
+    public function grantLocationException(int $memberId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if (! $target) {
+            return;
+        }
+
+        $target->update(['location_exempt' => true]);
+        $this->logActivity('settings', "{$target->display_name} was exempted from the location check.");
+        $this->broadcastUpdate('members');
+    }
+
+    public function kickMember(int $memberId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if ($target && ! $target->isHost()) {
+            $target->update(['left_at' => now()]);
+            $this->logActivity('member_kicked', "{$target->display_name} was removed from the room.");
+            $this->broadcastUpdate('members');
+        }
+    }
+
+    public function approveMember(int $memberId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if ($target && ! $target->isHost()) {
+            $target->update(['approved_at' => now()]);
+            $this->logActivity('member_approved', "{$target->display_name} was let into the room.");
+            $this->broadcastUpdate('members');
+        }
+    }
+
+    public function denyMember(int $memberId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if ($target && ! $target->isHost()) {
+            $target->update(['left_at' => now()]);
+            $this->logActivity('member_denied', "{$target->display_name}'s request to join was denied.");
+            $this->broadcastUpdate('members');
+        }
+    }
+
+    public function verifyLocation(float $lat, float $lng): void
+    {
+        if ($this->room->isWithinBoundary($lat, $lng)) {
+            $this->member->update(['location_verified_at' => now()]);
+            $this->controlError = '';
+        } else {
+            $this->controlError = 'You need to be closer to the room to control playback.';
+        }
+    }
+
+    public function leaveRoom()
+    {
+        if (! $this->isHost) {
+            app(RoomMembership::class)->leave($this->member);
+            $this->broadcastUpdate('members');
+        }
+
+        // Anonymous guests have no dashboard to go to — /dashboard would just
+        // bounce them through the login screen, so send them to the homepage.
+        return $this->redirect(auth()->check() ? route('dashboard') : url('/'));
+    }
+
+    public function closeRoom()
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $this->logActivity('closed', 'Host closed the room.');
+        $this->room->update(['closed_at' => now()]);
+
+        return $this->redirect(route('dashboard'));
+    }
+
+    public function exportActivityLog()
+    {
+        $events = $this->room->activityEvents()->orderBy('created_at')->get();
+
+        $csv = "timestamp,type,message\n";
+
+        foreach ($events as $event) {
+            $csv .= sprintf(
+                "%s,%s,\"%s\"\n",
+                $event->created_at->toIso8601String(),
+                $event->type,
+                str_replace('"', '""', $event->message)
+            );
+        }
+
+        return response()->streamDownload(
+            fn () => print($csv),
+            "auxroom-{$this->room->invite_code}-activity.csv"
+        );
+    }
+
+    private function providerDeviceId(): ?string
+    {
+        return $this->room->playbackProvider?->spotifyAccount?->active_device_id;
+    }
+
+    private function startPlayback(QueueItem $item): void
+    {
+        $client = app(SpotifyClientFactory::class)->forRoom($this->room);
+        $client->playTrack('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId());
+
+        $this->room->update([
+            'now_playing_queue_item_id' => $item->id,
+            'now_playing_started_at' => now(),
+            'now_playing_position_ms' => 0,
+            'is_playing' => true,
+            'is_playing_fallback' => false,
+        ]);
+
+        $this->logActivity('played', "Now playing: \"{$item->name}\" by {$item->artist}.");
+    }
+
+    /**
+     * Hands playback off to Spotify's own shuffled playback of the fallback
+     * playlist. AuxRoom doesn't manage its tracks one by one — Spotify keeps
+     * it going on its own until a guest queues something, which interrupts it.
+     */
+    private function startFallbackPlayback(): void
+    {
+        $client = app(SpotifyClientFactory::class)->forRoom($this->room);
+        $client->playContext($this->room->fallback_playlist_uri, $this->providerDeviceId(), true);
+
+        $this->room->update([
+            'now_playing_queue_item_id' => null,
+            'now_playing_started_at' => now(),
+            'now_playing_position_ms' => 0,
+            'is_playing' => true,
+            'is_playing_fallback' => true,
+        ]);
+
+        $this->logActivity('played', "Fallback playlist started: \"{$this->room->fallback_playlist_name}\".");
+    }
+
+    private function advanceQueue(): void
+    {
+        DB::transaction(function () {
+            $room = Room::whereKey($this->room->id)->lockForUpdate()->first();
+
+            if ($room->now_playing_queue_item_id) {
+                QueueItem::whereKey($room->now_playing_queue_item_id)->update(['played_at' => now()]);
+            }
+
+            $room->update([
+                'now_playing_queue_item_id' => null,
+                'now_playing_started_at' => null,
+                'now_playing_position_ms' => 0,
+                'is_playing' => false,
+            ]);
+
+            $this->room = $room->fresh();
+        });
+
+        $next = $this->room->pendingQueueItems()->first();
+
+        if ($next) {
+            $this->startPlayback($next);
+
+            return;
+        }
+
+        if ($this->room->fallback_playlist_uri) {
+            $this->startFallbackPlayback();
+        }
+    }
+
+    private function autoAdvanceIfNeeded(): void
+    {
+        $this->room->refresh();
+
+        $current = $this->room->nowPlaying;
+
+        if ($this->room->is_playing && $current && $this->room->currentPositionMs() >= $current->duration_ms) {
+            $this->advanceQueue();
+            $this->broadcastUpdate('playback');
+        }
+    }
+
+    private function passesGate(string $ability): bool
+    {
+        $this->controlError = '';
+
+        if (! $this->isApproved) {
+            $this->controlError = 'Waiting for the host to let you in.';
+
+            return false;
+        }
+
+        if (! $this->isHost && $ability === 'guests_can_add_to_queue' && ! $this->room->guests_can_add_to_queue) {
+            $this->controlError = 'The host has locked the queue for everyone.';
+
+            return false;
+        }
+
+        if (! $this->isHost && $ability !== 'guests_can_add_to_queue' && ! (bool) $this->member->{self::ABILITY_COLUMNS[$ability]}) {
+            $this->controlError = 'The host hasn\'t given you this permission.';
+
+            return false;
+        }
+
+        if (! $this->member->passesLocationCheck()) {
+            $this->controlError = 'You need to verify you\'re near the room before controlling playback.';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function logActivity(string $type, string $message): void
+    {
+        ActivityEvent::create([
+            'room_id' => $this->room->id,
+            'member_id' => $this->member->id,
+            'type' => $type,
+            'message' => $message,
+        ]);
+    }
+
+    private function broadcastUpdate(string $reason): void
+    {
+        broadcast(new RoomUpdated($this->room, $reason));
+    }
+
+    public function logout(Logout $logout): mixed
+    {
+        $logout();
+
+        return $this->redirect('/', navigate: true);
+    }
+
+    public function render()
+    {
+        $view = view('livewire.dashboard.show');
+
+        // Hosts get the same app shell (navbar, dropdown, hamburger) as every
+        // other authenticated page. Guests aren't authenticated, so they get
+        // a minimal standalone shell instead.
+        if ($this->isHost) {
+            return $view->layout('layouts.app');
+        }
+
+        return $view->layout('layouts.room', ['title' => $this->room->name]);
+    }
+}
