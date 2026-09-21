@@ -628,14 +628,26 @@ class ShowRoom extends Component
             return;
         }
 
-        // A paused device remembers exactly what it was playing — context,
-        // queue and position — so resuming bare (no body) picks up exactly
-        // where it left off. Re-issuing a track or context here instead
-        // (the old approach) replaced the device's native queue every time
-        // and, for a shuffled playlist, restarted it from a new random
-        // point that looked like the track had skipped ahead.
         if ($this->room->now_playing_track_id) {
-            if (app(SpotifyClientFactory::class)->forRoom($this->room)->resume($this->providerDeviceId())) {
+            // A track playing from the fallback playlist's context resumes
+            // via that same context (offset to this track, at this exact
+            // position) rather than a bare track URI — a bare URI replaces
+            // the context entirely, and once that track ends Spotify has
+            // nothing left to advance to, so every future resume just
+            // replays that same now-context-less track forever.
+            if ($this->room->is_playing_fallback && $this->room->fallback_playlist_uri) {
+                if (! app(SpotifyClientFactory::class)->forRoom($this->room)->resumeContext(
+                    $this->room->fallback_playlist_uri,
+                    'spotify:track:'.$this->room->now_playing_track_id,
+                    $this->room->now_playing_position_ms,
+                    $this->room->shuffle_enabled,
+                    $this->providerDeviceId()
+                )) {
+                    $this->controlError = "Spotify couldn't resume the playlist. Try reselecting the device in Host Hub.";
+
+                    return;
+                }
+
                 $this->room->update([
                     'is_playing' => true,
                     'now_playing_started_at' => now()->subMilliseconds($this->room->now_playing_position_ms),
@@ -648,12 +660,8 @@ class ShowRoom extends Component
                 return;
             }
 
-            // Bare resume can fail (Spotify drops the paused state often
-            // enough in practice) — fall back to resuming this exact track
-            // at its exact position. Restarting the fallback playlist's
-            // context instead (the previous approach here) always forced
-            // shuffle back on and picked a new random track, which is
-            // exactly the "skips to next track" bug this replaces.
+            // A standalone queued track has no context to preserve, so
+            // re-issuing it directly at its exact position is safe.
             if (! $this->playTrackAt(
                 $this->room->now_playing_track_id,
                 $this->room->now_playing_name ?? 'Unknown track',

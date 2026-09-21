@@ -65,11 +65,30 @@ class SpotifyWebApiClient implements SpotifyClientContract
         ]);
     }
 
-    public function resume(?string $deviceId = null): bool
+    /**
+     * Resumes a specific track inside a context (a playlist) at an exact
+     * position, instead of replacing the context with a single bare track
+     * URI. A bare `uris:[trackUri]` play — what this used to do — wipes out
+     * the context entirely: once that track ends, Spotify has nothing left
+     * to advance to, so every future resume just replays that same
+     * context-less track forever. `offset` + `position_ms` inside a
+     * `context_uri` play resumes the exact same spot while keeping the
+     * context (and its native auto-advance) intact.
+     */
+    public function resumeContext(string $contextUri, string $trackUri, int $positionMs, bool $shuffle, ?string $deviceId = null): bool
     {
         $query = $deviceId ? ['device_id' => $deviceId] : [];
 
-        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, []);
+        $this->putWithQuery('https://api.spotify.com/v1/me/player/shuffle', [
+            ...$query,
+            'state' => $shuffle ? 'true' : 'false',
+        ], []);
+
+        return $this->putWithQuery('https://api.spotify.com/v1/me/player/play', $query, [
+            'context_uri' => $contextUri,
+            'offset' => ['uri' => $trackUri],
+            'position_ms' => $positionMs,
+        ]);
     }
 
     public function pause(?string $deviceId = null): bool
