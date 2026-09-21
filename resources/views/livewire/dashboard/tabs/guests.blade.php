@@ -133,7 +133,7 @@
                                 'guests_can_skip' => ['can_skip', 'Skip track'],
                                 'guests_can_seek' => ['can_seek', 'Seek / scrub'],
                                 'guests_can_set_volume' => ['can_set_volume', 'Change volume'],
-                                'guests_can_manage_playlist' => ['can_manage_playlist', 'Manage fallback playlist'],
+                                'guests_can_manage_playlist' => ['can_manage_playlist', 'Play a playlist'],
                             ] as $ability => [$column, $label])
                                 <button wire:click="setMemberPermission({{ $m->id }}, '{{ $ability }}', {{ $m->{$column} ? 'false' : 'true' }})"
                                         class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs {{ $m->{$column} ? 'bg-aux-accent-soft text-aux-accent' : 'bg-white/5 text-aux-faint' }}">

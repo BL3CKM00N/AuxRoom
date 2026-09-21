@@ -17,12 +17,15 @@
                         <x-icon name="note" class="w-3.5 h-3.5" /> {{ $room->is_playing ? 'Now spinning' : 'On pause' }}
                     </span>
                     <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($room->is_playing_fallback ? $room->fallback_playlist_name : 'Nothing queued yet') }}</h2>
-                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Fallback playlist · shuffled' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track')) }}</p>
+                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Playlist · shuffled' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track')) }}</p>
+                    @if ($room->is_playing_fallback && $this->nowPlaying)
+                        <p class="text-[11px] text-aux-accent mt-0.5">Playing from {{ $room->fallback_playlist_name }}</p>
+                    @endif
 
-                    @if ($this->nowPlaying)
+                    @if ($this->nowPlaying || $room->is_playing_fallback)
                         <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint"
                              x-data="playbackClock()"
-                             x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                             x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                              x-on:playback-sync.window="sync($event.detail)">
                             <span x-text="formatMs(positionMs)"></span>
                             <input type="range" min="0" :max="durationMs || 100" :value="positionMs"
@@ -39,6 +42,10 @@
                             @if ($this->isMock)
                                 <span class="px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-semibold text-aux-muted">SAMPLE TRACK</span>
                             @endif
+                            <button wire:click="previous" @disabled(! $this->canGuest('guests_can_skip'))
+                                    class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
+                                <x-icon name="back" class="w-4 h-4" />
+                            </button>
                             @if ($room->is_playing)
                                 <button wire:click="pause" @disabled(! $this->canGuest('guests_can_play_pause'))
                                         class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/10 text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed">
@@ -174,24 +181,24 @@
             </div>
         </div>
 
-        {{-- Fallback playlist --}}
+        {{-- Playlist --}}
         @if ($this->isMock)
             <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
-                <h3 class="font-semibold">Fallback Playlist</h3>
-                <p class="mt-1 text-xs text-aux-faint">Plays automatically, shuffled, whenever the queue runs dry.</p>
+                <h3 class="font-semibold">Playlist</h3>
+                <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify.</p>
                 <p class="mt-3 text-sm text-aux-faint">
-                    {{ $this->isHost ? 'Connect Spotify in Host Hub to set a fallback playlist.' : "The host hasn't connected Spotify yet — a fallback playlist isn't available." }}
+                    {{ $this->isHost ? 'Connect Spotify in Host Hub to play a playlist.' : "The host hasn't connected Spotify yet — playlists aren't available." }}
                 </p>
             </div>
         @elseif ($this->canGuest('guests_can_manage_playlist'))
             <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
                 <div class="flex items-center justify-between">
-                    <h3 class="font-semibold">Fallback Playlist</h3>
+                    <h3 class="font-semibold">Playlist</h3>
                     @if ($room->is_playing_fallback)
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-aux-accent-soft text-aux-accent">PLAYING</span>
                     @endif
                 </div>
-                <p class="mt-1 text-xs text-aux-faint">Plays automatically, shuffled, whenever the queue runs dry.</p>
+                <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify. Added songs play next without interrupting it.</p>
 
                 @if ($room->fallback_playlist_uri)
                     <div class="mt-3 flex items-center gap-3">
@@ -203,8 +210,8 @@
                             @endif
                         </div>
                         <p class="min-w-0 flex-1 truncate text-sm font-medium">{{ $room->fallback_playlist_name }}</p>
-                        <button wire:click="clearFallbackPlaylist" class="shrink-0 text-[11px] font-medium text-red-400 hover:text-red-300">
-                            Remove
+                        <button wire:click="stopPlaylist" class="shrink-0 text-[11px] font-medium text-red-400 hover:text-red-300">
+                            Stop
                         </button>
                     </div>
                 @endif
@@ -237,9 +244,9 @@
                                     <p class="truncate text-sm font-medium">{{ $p['name'] }}</p>
                                     <p class="truncate text-xs text-aux-faint">{{ $p['owner'] }}{{ $p['track_count'] !== null ? ' · '.$p['track_count'].' tracks' : '' }}</p>
                                 </div>
-                                <button wire:click="selectFallbackPlaylist({{ $i }})"
+                                <button wire:click="playPlaylist({{ $i }})"
                                         class="shrink-0 px-2.5 py-1 rounded-full bg-aux-accent text-black text-xs font-semibold">
-                                    Use
+                                    Play
                                 </button>
                             </li>
                         @endforeach
@@ -249,12 +256,11 @@
         @elseif ($room->fallback_playlist_uri)
             <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
                 <div class="flex items-center justify-between">
-                    <h3 class="font-semibold">Fallback Playlist</h3>
+                    <h3 class="font-semibold">Playlist</h3>
                     @if ($room->is_playing_fallback)
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-aux-accent-soft text-aux-accent">PLAYING</span>
                     @endif
                 </div>
-                <p class="mt-1 text-xs text-aux-faint">Plays automatically when the queue runs dry.</p>
                 <div class="mt-3 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-md bg-aux-card-hover flex items-center justify-center overflow-hidden shrink-0">
                         @if ($room->fallback_playlist_image_url)

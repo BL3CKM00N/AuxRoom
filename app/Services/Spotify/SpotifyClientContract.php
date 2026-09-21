@@ -47,6 +47,14 @@ interface SpotifyClientContract
     public function addToPlaybackQueue(string $uri, ?string $deviceId = null): bool;
 
     /**
+     * Native transport controls — these respect whatever Spotify actually
+     * has queued/shuffled, unlike locally guessing what plays next.
+     */
+    public function skipToNext(?string $deviceId = null): bool;
+
+    public function skipToPrevious(?string $deviceId = null): bool;
+
+    /**
      * The real, current playback state as Spotify sees it right now — used
      * to detect changes made outside AuxRoom (pausing/seeking from the
      * Spotify app itself, switching to a different track on another

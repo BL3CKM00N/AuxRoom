@@ -73,4 +73,14 @@ class MockSpotifyClient implements SpotifyClientContract
     {
         return true;
     }
+
+    public function skipToNext(?string $deviceId = null): bool
+    {
+        return true;
+    }
+
+    public function skipToPrevious(?string $deviceId = null): bool
+    {
+        return true;
+    }
 }

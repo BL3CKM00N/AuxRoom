@@ -168,10 +168,29 @@ class SpotifyWebApiClient implements SpotifyClientContract
             $query['device_id'] = $deviceId;
         }
 
-        $response = $this->http()->post('https://api.spotify.com/v1/me/player/queue?'.http_build_query($query));
+        return $this->postWithQuery('https://api.spotify.com/v1/me/player/queue', $query);
+    }
+
+    public function skipToNext(?string $deviceId = null): bool
+    {
+        return $this->postWithQuery('https://api.spotify.com/v1/me/player/next', $deviceId ? ['device_id' => $deviceId] : []);
+    }
+
+    public function skipToPrevious(?string $deviceId = null): bool
+    {
+        return $this->postWithQuery('https://api.spotify.com/v1/me/player/previous', $deviceId ? ['device_id' => $deviceId] : []);
+    }
+
+    private function postWithQuery(string $url, array $query): bool
+    {
+        if (! empty($query)) {
+            $url .= '?'.http_build_query($query);
+        }
+
+        $response = $this->http()->post($url);
 
         if ($response->failed()) {
-            Log::warning('Spotify add-to-queue failed', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::warning('Spotify playback command failed', ['url' => $url, 'status' => $response->status(), 'body' => $response->body()]);
         }
 
         return $response->successful();

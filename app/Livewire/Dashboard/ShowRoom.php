@@ -10,7 +10,6 @@ use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
 use App\Services\Spotify\SpotifyClientFactory;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -215,40 +214,27 @@ class ShowRoom extends Component
         }
 
         // Spotify's own context tells us, authoritatively, whether it's
-        // currently playing from the fallback playlist — rather than
+        // currently playing from the selected playlist — rather than
         // trusting a locally-toggled flag that can go stale once native
-        // queue items start interleaving with the underlying context.
+        // queue items start interleaving with the underlying context. This
+        // is purely an informational badge now — the actual track always
+        // gets tracked the same way below, regardless of where it's from.
         $isFallbackContext = $this->room->fallback_playlist_uri
             && $state['context_uri'] === $this->room->fallback_playlist_uri;
 
         $current = $this->room->nowPlaying;
-        $trackChanged = ! $isFallbackContext
-            && $state['track_id']
-            && $current?->spotify_track_id !== $state['track_id'];
+        $trackChanged = $state['track_id'] && $current?->spotify_track_id !== $state['track_id'];
 
         $nowPlayingQueueItemId = $this->room->now_playing_queue_item_id;
 
-        if ($isFallbackContext) {
-            // Resumed (or still on) the fallback playlist itself — whatever
-            // queued track was playing before is done, and there's nothing
-            // specific to display beyond the fallback playlist's own info.
-            if ($current) {
-                $this->room->queueItems()
-                    ->whereNull('played_at')
-                    ->where('position', '<=', $current->position)
-                    ->update(['played_at' => now()]);
-            }
-
-            $nowPlayingQueueItemId = null;
-        } elseif ($trackChanged) {
+        if ($trackChanged) {
             $matched = $this->room->pendingQueueItems()->where('spotify_track_id', $state['track_id'])->first();
 
             if (! $matched) {
-                // Playing something outside our queue and the fallback
-                // playlist (started directly from Spotify, another device,
-                // etc) — track it like any other item so the room shows
-                // exactly what's actually playing, the same way switching
-                // devices in Spotify itself shows the current track.
+                // Playing a track we have no record of — from the shuffled
+                // playlist, started directly from Spotify, another device,
+                // etc — track it like any other item so Now Playing, seek,
+                // and skip all work the same regardless of where it's from.
                 $matched = $this->room->queueItems()->create([
                     'added_by_id' => null,
                     'spotify_track_id' => $state['track_id'],
@@ -261,7 +247,9 @@ class ShowRoom extends Component
                     'position' => (int) ($this->room->pendingQueueItems()->min('position') ?? 1) - 1,
                 ]);
 
-                $this->logActivity('played', "Now playing from Spotify: \"{$matched->name}\".");
+                if (! $isFallbackContext) {
+                    $this->logActivity('played', "Now playing from Spotify: \"{$matched->name}\".");
+                }
             }
 
             $this->room->queueItems()
@@ -536,7 +524,13 @@ class ShowRoom extends Component
         $this->playlistResults = app(SpotifyClientFactory::class)->forRoom($this->room)->myPlaylists();
     }
 
-    public function selectFallbackPlaylist(int $index): void
+    /**
+     * Picks a playlist and starts playing it immediately — the same as
+     * tapping a playlist and hitting play in Spotify itself. Queued songs
+     * still play next without interrupting it, and it resumes on its own
+     * once the queue drains, since we never replace its context to do that.
+     */
+    public function playPlaylist(int $index): void
     {
         if (! $this->passesGate('guests_can_manage_playlist')) {
             return;
@@ -554,14 +548,21 @@ class ShowRoom extends Component
             'fallback_playlist_image_url' => $playlist['image_url'],
         ]);
 
+        if (! $this->startFallbackPlayback()) {
+            return;
+        }
+
         $this->playlistQuery = '';
         $this->playlistResults = [];
 
-        $this->logActivity('settings', "{$this->member->display_name} set the fallback playlist to \"{$playlist['name']}\".");
-        $this->broadcastUpdate('settings');
+        // Learn the actual track Spotify picked to start with right away,
+        // instead of waiting up to 3s for the next heartbeat poll.
+        $this->syncWithSpotify();
+
+        $this->broadcastUpdate('playback');
     }
 
-    public function clearFallbackPlaylist(): void
+    public function stopPlaylist(): void
     {
         if (! $this->passesGate('guests_can_manage_playlist')) {
             return;
@@ -574,7 +575,7 @@ class ShowRoom extends Component
             'is_playing_fallback' => false,
         ]);
 
-        $this->logActivity('settings', "{$this->member->display_name} removed the fallback playlist.");
+        $this->logActivity('settings', "{$this->member->display_name} stopped the playlist.");
         $this->broadcastUpdate('settings');
     }
 
@@ -653,14 +654,42 @@ class ShowRoom extends Component
         $this->broadcastUpdate('playback');
     }
 
+    /**
+     * Skips via Spotify's own "next" transport control, not a local guess —
+     * this respects whatever Spotify actually has queued/shuffled next,
+     * including tracks from a playing playlist we don't know the order of.
+     */
     public function skip(): void
     {
         if (! $this->passesGate('guests_can_skip')) {
             return;
         }
 
-        $this->advanceQueue();
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->skipToNext($this->providerDeviceId())) {
+            $this->controlError = "Spotify couldn't skip the track.";
+
+            return;
+        }
+
         $this->logActivity('skipped', "{$this->member->display_name} skipped the track.");
+        $this->syncWithSpotify();
+        $this->broadcastUpdate('playback');
+    }
+
+    public function previous(): void
+    {
+        if (! $this->passesGate('guests_can_skip')) {
+            return;
+        }
+
+        if (! app(SpotifyClientFactory::class)->forRoom($this->room)->skipToPrevious($this->providerDeviceId())) {
+            $this->controlError = "Spotify couldn't go back a track.";
+
+            return;
+        }
+
+        $this->logActivity('skipped', "{$this->member->display_name} went back a track.");
+        $this->syncWithSpotify();
         $this->broadcastUpdate('playback');
     }
 
@@ -670,7 +699,7 @@ class ShowRoom extends Component
             return;
         }
 
-        if (! $this->room->now_playing_queue_item_id) {
+        if (! $this->room->now_playing_queue_item_id && ! $this->room->is_playing_fallback) {
             return;
         }
 
@@ -1057,38 +1086,6 @@ class ShowRoom extends Component
         $this->logActivity('played', "Fallback playlist started: \"{$this->room->fallback_playlist_name}\".");
 
         return true;
-    }
-
-    private function advanceQueue(): void
-    {
-        DB::transaction(function () {
-            $room = Room::whereKey($this->room->id)->lockForUpdate()->first();
-
-            if ($room->now_playing_queue_item_id) {
-                QueueItem::whereKey($room->now_playing_queue_item_id)->update(['played_at' => now()]);
-            }
-
-            $room->update([
-                'now_playing_queue_item_id' => null,
-                'now_playing_started_at' => null,
-                'now_playing_position_ms' => 0,
-                'is_playing' => false,
-            ]);
-
-            $this->room = $room->fresh();
-        });
-
-        $next = $this->room->pendingQueueItems()->first();
-
-        if ($next) {
-            $this->startPlayback($next);
-
-            return;
-        }
-
-        if ($this->room->fallback_playlist_uri) {
-            $this->startFallbackPlayback();
-        }
     }
 
     private function passesGate(string $ability): bool

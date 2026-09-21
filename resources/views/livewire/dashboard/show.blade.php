@@ -119,14 +119,17 @@
             </div>
             <div class="min-w-0 hidden sm:block">
                 <p class="text-sm font-medium truncate">{{ $this->nowPlaying->name ?? ($room->is_playing_fallback ? $room->fallback_playlist_name : 'Nothing playing') }}</p>
-                <p class="text-xs text-aux-faint truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Fallback playlist · shuffled' : ($this->isMock ? 'Connect Spotify to add a track' : 'Add a track to start')) }}</p>
+                <p class="text-xs text-aux-faint truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Playlist · shuffled' : ($this->isMock ? 'Connect Spotify to add a track' : 'Add a track to start')) }}</p>
             </div>
         </div>
 
         <div class="flex-1 flex flex-col items-center gap-1 min-w-0">
             <div class="flex items-center gap-4">
                 <button disabled class="text-aux-faint opacity-40 cursor-default"><x-icon name="shuffle" class="w-4 h-4" /></button>
-                <button disabled class="text-aux-faint opacity-40 cursor-default"><x-icon name="back" class="w-4 h-4" /></button>
+                <button wire:click="previous" @disabled((! $this->nowPlaying && ! $room->is_playing_fallback) || ! $this->canGuest('guests_can_skip'))
+                        class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
+                    <x-icon name="back" class="w-4 h-4" />
+                </button>
                 @if ($room->is_playing)
                     <button wire:click="pause" @disabled(! $this->canGuest('guests_can_play_pause'))
                             class="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed">
@@ -138,7 +141,7 @@
                         <x-icon name="play" class="w-4 h-4" />
                     </button>
                 @endif
-                <button wire:click="skip" @disabled(! $this->nowPlaying || ! $this->canGuest('guests_can_skip')) class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
+                <button wire:click="skip" @disabled((! $this->nowPlaying && ! $room->is_playing_fallback) || ! $this->canGuest('guests_can_skip')) class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
                     <x-icon name="skip" class="w-4 h-4" />
                 </button>
                 <button disabled class="text-aux-faint opacity-40 cursor-default"><x-icon name="repeat" class="w-4 h-4" /></button>
@@ -149,7 +152,7 @@
                  x-on:playback-sync.window="sync($event.detail)">
                 <span x-text="formatMs(positionMs)"></span>
                 <input type="range" min="0" :max="durationMs || 100" :value="positionMs"
-                       @disabled(! $this->nowPlaying || ! $this->canGuest('guests_can_seek'))
+                       @disabled((! $this->nowPlaying && ! $room->is_playing_fallback) || ! $this->canGuest('guests_can_seek'))
                        @mousedown="dragging = true" @touchstart="dragging = true"
                        @mouseup="dragging = false" @touchend="dragging = false"
                        @input="positionMs = Number($event.target.value)"
