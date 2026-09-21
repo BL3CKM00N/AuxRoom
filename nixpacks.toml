@@ -1,0 +1,5 @@
+# Overrides Nixpacks' default start phase so a single deploy runs
+# migrations, launches Reverb in the background, and serves the app in the
+# foreground — without needing a separate service or a manual SSH step.
+[start]
+cmd = "php artisan migrate --force; php artisan reverb:start --host=0.0.0.0 --port=8080 & php artisan serve --host=0.0.0.0 --port=80"
