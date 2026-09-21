@@ -109,7 +109,7 @@
 
     {{-- Bottom player bar --}}
     <div class="fixed bottom-0 inset-x-0 bg-aux-sidebar border-t border-aux-border px-4 sm:px-6 py-3 flex items-center gap-4 z-20">
-        <div class="flex items-center gap-3 w-48 shrink-0 min-w-0">
+        <div class="flex items-center gap-3 shrink-0 min-w-0 sm:w-48">
             <div class="w-11 h-11 rounded-md bg-aux-card flex items-center justify-center shrink-0 overflow-hidden">
                 @if ($this->nowPlaying?->album_art_url)
                     <img src="{{ $this->nowPlaying->album_art_url }}" class="w-full h-full object-cover" alt="">
@@ -155,19 +155,19 @@
                     @endif
                 </button>
             </div>
-            <div class="w-full max-w-md flex items-center gap-2 text-[10px] text-aux-faint"
+            <div class="w-full max-w-md min-w-0 flex items-center gap-2 text-[10px] text-aux-faint"
                  x-data="playbackClock()"
                  x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                  x-on:playback-sync.window="sync($event.detail)">
-                <span x-text="formatMs(positionMs)"></span>
+                <span class="shrink-0" x-text="formatMs(positionMs)"></span>
                 <input type="range" min="0" :max="durationMs || 100" :value="positionMs"
                        @disabled((! $this->nowPlaying && ! $room->is_playing_fallback) || ! $this->canGuest('guests_can_seek'))
                        @mousedown="dragging = true" @touchstart="dragging = true"
                        @mouseup="dragging = false" @touchend="dragging = false"
                        @input="positionMs = Number($event.target.value)"
                        :style="`background: linear-gradient(to right, #22c55e ${seekPct}%, rgba(255,255,255,0.12) ${seekPct}%); background-clip: content-box;`"
-                       wire:change="seek($event.target.value)" class="seek-bar flex-1 disabled:opacity-30">
-                <span x-text="formatMs(durationMs)"></span>
+                       wire:change="seek($event.target.value)" class="seek-bar flex-1 min-w-0 disabled:opacity-30">
+                <span class="shrink-0" x-text="formatMs(durationMs)"></span>
             </div>
         </div>
 
@@ -199,6 +199,45 @@
                        :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%)`"
                        x-on:input="volume = $event.target.valueAsNumber"
                        wire:change="setVolume($event.target.value)" class="w-20 disabled:opacity-30">
+            </div>
+        </div>
+
+        {{-- Mobile: same controls (queue shortcut, device, volume) tucked
+             behind one touch-sized button instead of competing for space
+             in the bar itself. --}}
+        <div class="md:hidden relative shrink-0" x-data="{ open: false }">
+            <button @click="open = !open" class="w-11 h-11 -m-1 flex items-center justify-center text-aux-muted hover:text-aux-text">
+                <x-icon name="volume" class="w-5 h-5" />
+            </button>
+            <div x-show="open" x-cloak @click.outside="open = false"
+                 class="absolute right-0 bottom-full mb-3 w-64 rounded-xl bg-aux-card-hover border border-aux-border shadow-xl p-2 z-30">
+                <button wire:click="setTab('queue')" @click="open = false"
+                        class="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/5 text-sm">
+                    <x-icon name="queue-list" class="w-5 h-5" /> Queue
+                </button>
+
+                @if ($this->isHost)
+                    <p class="mt-1 px-3 pt-2 text-[11px] uppercase tracking-wide text-aux-faint">Device</p>
+                    @forelse ($this->devices as $device)
+                        <button wire:click="selectDevice('{{ $device['id'] }}', '{{ $device['name'] }}')"
+                                class="w-full text-left px-3 py-3 rounded-lg text-sm {{ ($room->playbackProvider?->spotifyAccount?->active_device_id ?? null) === $device['id'] ? 'bg-aux-accent-soft text-aux-accent' : 'hover:bg-white/5' }}">
+                            {{ $device['name'] }}
+                        </button>
+                    @empty
+                        <p class="px-3 py-2 text-xs text-aux-faint">No devices found. Open Spotify somewhere first.</p>
+                    @endforelse
+                @endif
+
+                <div class="px-3 pt-3 pb-1" x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume">
+                    <div class="flex items-center justify-between text-[11px] text-aux-faint mb-2">
+                        <span class="uppercase tracking-wide">Volume</span>
+                        <span x-text="volume"></span>
+                    </div>
+                    <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume'))
+                           :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%); background-clip: content-box;`"
+                           x-on:input="volume = $event.target.valueAsNumber"
+                           wire:change="setVolume($event.target.value)" class="seek-bar w-full disabled:opacity-30">
+                </div>
             </div>
         </div>
     </div>

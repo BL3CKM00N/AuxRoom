@@ -1,18 +1,18 @@
 {{-- Now Playing --}}
-<div class="grid gap-6 lg:grid-cols-3">
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <div class="lg:col-span-2 space-y-6">
 
         {{-- Now playing --}}
         <div class="p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border">
-            <div class="flex gap-5">
-                <div class="w-28 h-28 rounded-lg bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
+            <div class="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
+                <div class="w-36 h-36 sm:w-28 sm:h-28 rounded-lg bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
                     @if ($this->nowPlaying?->album_art_url)
                         <img src="{{ $this->nowPlaying->album_art_url }}" class="w-full h-full object-cover" alt="">
                     @else
                         <x-icon name="note" class="w-8 h-8 text-aux-faint" />
                     @endif
                 </div>
-                <div class="min-w-0 flex-1">
+                <div class="w-full min-w-0 sm:flex-1">
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-aux-accent">
                         <x-icon name="note" class="w-3.5 h-3.5" /> {{ $room->is_playing ? 'Now spinning' : 'On pause' }}
                     </span>
@@ -35,17 +35,18 @@
                             <span x-text="formatMs(durationMs)"></span>
                         </div>
 
-                        <div class="mt-3 flex items-center gap-3">
+                        <div class="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:justify-start">
                             @if ($this->isMock)
-                                <span class="px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-semibold text-aux-muted">SAMPLE TRACK</span>
+                                <span class="hidden sm:inline px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-semibold text-aux-muted">SAMPLE TRACK</span>
                             @endif
                             <button wire:click="toggleShuffle" @disabled(! $this->canGuest('guests_can_play_pause'))
                                     class="disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
                                 <x-icon name="shuffle" class="w-4 h-4" />
                             </button>
+                            {{-- Text labels match the bottom bar's icon-only convention below sm --}}
                             <button wire:click="previous" @disabled(! $this->canGuest('guests_can_skip'))
                                     class="inline-flex items-center gap-1 text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
-                                <x-icon name="back" class="w-4 h-4" /> Previous
+                                <x-icon name="back" class="w-4 h-4" /> <span class="hidden sm:inline">Previous</span>
                             </button>
                             @if ($room->is_playing)
                                 <button wire:click="pause" @disabled(! $this->canGuest('guests_can_play_pause'))
@@ -60,7 +61,7 @@
                             @endif
                             <button wire:click="skip" @disabled(! $this->canGuest('guests_can_skip'))
                                     class="inline-flex items-center gap-1 text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
-                                <x-icon name="skip" class="w-4 h-4" /> Skip track
+                                <x-icon name="skip" class="w-4 h-4" /> <span class="hidden sm:inline">Skip track</span>
                             </button>
                             <button wire:click="toggleRepeat" @disabled(! $this->canGuest('guests_can_play_pause'))
                                     class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->repeat_mode !== 'off' ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">

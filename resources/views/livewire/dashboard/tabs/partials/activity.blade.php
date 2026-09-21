@@ -1,10 +1,12 @@
 <div class="p-5 rounded-xl bg-aux-card border border-aux-border" x-data="{ open: false }">
     <button type="button" @click="open = !open" class="w-full flex items-center justify-between text-left">
-        <div class="flex items-center gap-2">
-            <x-icon name="clock" class="w-4 h-4 text-aux-accent" />
-            <h3 class="font-semibold">Room Activity</h3>
+        <div class="flex items-center gap-3">
+            <span class="w-9 h-9 rounded-full bg-aux-accent-soft text-aux-accent flex items-center justify-center shrink-0">
+                <x-icon name="clock" class="w-4 h-4" />
+            </span>
+            <p class="font-medium text-sm">Room Activity</p>
         </div>
-        <x-icon name="chevron-right" class="w-4 h-4 text-aux-faint transition" x-bind:class="{ 'rotate-90': open }" />
+        <x-icon name="chevron-right" class="w-4 h-4 text-aux-faint transition shrink-0" x-bind:class="{ 'rotate-90': open }" />
     </button>
 
     <div x-show="open" x-cloak>
