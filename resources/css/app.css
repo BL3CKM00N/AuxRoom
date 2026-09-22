@@ -19,6 +19,9 @@ html {
 body {
     background-color: #0a0d12;
     color: #f5f7fa;
+    /* touch-action isn't inherited, and touches land on body/its descendants,
+       not html itself — without this the rule above never actually applies. */
+    touch-action: pan-y;
     overflow-x: hidden;
 }
 

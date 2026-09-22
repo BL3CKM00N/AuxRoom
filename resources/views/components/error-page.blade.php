@@ -34,5 +34,12 @@
                 Go back home
             </a>
         </div>
+
+        <script>
+            // iOS Safari ignores the viewport meta tag's user-scalable=no; these
+            // gesture events are the actual mechanism needed to block pinch-zoom there.
+            document.addEventListener('gesturestart', (e) => e.preventDefault());
+            document.addEventListener('gesturechange', (e) => e.preventDefault());
+        </script>
     </body>
 </html>

@@ -14,6 +14,18 @@ import 'leaflet/dist/leaflet.css';
 window.L = L;
 
 /**
+ * iOS Safari has deliberately ignored the viewport meta tag's
+ * user-scalable=no/maximum-scale=1 since iOS 10 (an accessibility override),
+ * so pinch-zoom still works there despite it. These are WebKit's own gesture
+ * events for a two-finger pinch — preventing them is the actual mechanism
+ * needed to stop it on iOS. Single- and multi-touch drags (the seek bar,
+ * volume slider, party screen touch controls) are unaffected since those
+ * only ever fire touch events, never gesture events.
+ */
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+
+/**
  * Drives the now-playing progress slider smoothly between server syncs.
  * The server only knows position via a wall-clock diff and only pushes it
  * on actions/heartbeats (every few seconds) — without this, the slider
