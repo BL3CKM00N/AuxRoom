@@ -17,14 +17,20 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans text-aux-text antialiased bg-aux-bg">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0">
+        <div class="ambient-glow" aria-hidden="true">
+            <div class="ambient-blob ambient-blob-1"></div>
+            <div class="ambient-blob ambient-blob-2"></div>
+            <div class="ambient-blob ambient-blob-3"></div>
+        </div>
+
+        <div class="relative z-10 min-h-screen flex flex-col justify-center items-center px-6 py-10">
             <div>
                 <a href="/" wire:navigate class="flex items-center text-aux-text">
                     <x-logo class="h-8" />
                 </a>
             </div>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-aux-card border border-aux-border overflow-hidden sm:rounded-lg">
+            <div class="w-full max-w-md mt-6 px-6 py-4 bg-aux-card border border-aux-border rounded-lg overflow-hidden">
                 {{ $slot }}
             </div>
         </div>

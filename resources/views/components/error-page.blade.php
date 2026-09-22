@@ -15,7 +15,13 @@
         @vite(['resources/css/app.css'])
     </head>
     <body class="font-sans text-aux-text antialiased bg-aux-bg">
-        <div class="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+        <div class="ambient-glow" aria-hidden="true">
+            <div class="ambient-blob ambient-blob-1"></div>
+            <div class="ambient-blob ambient-blob-2"></div>
+            <div class="ambient-blob ambient-blob-3"></div>
+        </div>
+
+        <div class="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 text-center">
             <a href="/" class="flex items-center">
                 <x-logo class="h-8" />
             </a>

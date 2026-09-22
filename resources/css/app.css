@@ -91,3 +91,77 @@ input[type='range']::-moz-range-thumb {
     border-radius: 9999px;
     background: #22c55e;
 }
+
+/* Soft, slow-drifting blurred blobs for the landing page hero. Pure CSS,
+   no JS, so it costs nothing beyond paint.
+
+   `fixed` + viewport-relative (vmax/%) sizing and positioning, rather than
+   an absolute box sized/anchored in rem: a fixed-size box left a visible
+   hard edge around the glow on large monitors (it stopped short of filling
+   the screen), and rem-sized blobs anchored to the viewport's corners on a
+   full-bleed layer drifted away from the centered content on ultra-wide
+   screens. Sizing/positioning as a fraction of the viewport scales with the
+   screen instead, so the glow always fills edge-to-edge and stays roughly
+   where the (centered) content is, at any resolution. */
+.ambient-glow {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.ambient-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(clamp(80px, 7vw, 160px));
+    will-change: transform;
+}
+
+.ambient-blob-1 {
+    width: 55vmax;
+    height: 55vmax;
+    top: -20vmax;
+    left: -18vmax;
+    background: radial-gradient(circle at 30% 30%, rgba(34, 197, 94, 0.55), transparent 70%);
+    animation: ambient-drift-1 28s ease-in-out infinite alternate;
+}
+
+.ambient-blob-2 {
+    width: 46vmax;
+    height: 46vmax;
+    bottom: -18vmax;
+    right: -14vmax;
+    background: radial-gradient(circle at 60% 40%, rgba(56, 189, 248, 0.4), transparent 70%);
+    animation: ambient-drift-2 34s ease-in-out infinite alternate;
+}
+
+.ambient-blob-3 {
+    width: 36vmax;
+    height: 36vmax;
+    top: 26%;
+    left: 40%;
+    background: radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.3), transparent 70%);
+    animation: ambient-drift-3 40s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-drift-1 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(4rem, 3rem) scale(1.08); }
+}
+
+@keyframes ambient-drift-2 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-3rem, -4rem) scale(1.1); }
+}
+
+@keyframes ambient-drift-3 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-2rem, 3rem) scale(0.95); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ambient-blob {
+        animation: none;
+    }
+}

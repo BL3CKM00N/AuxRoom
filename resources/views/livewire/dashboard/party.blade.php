@@ -35,6 +35,12 @@
      :class="controlsVisible ? '' : 'cursor-none'"
      class="min-h-screen bg-aux-bg text-aux-text flex flex-col relative">
 
+    <div class="ambient-glow" aria-hidden="true">
+        <div class="ambient-blob ambient-blob-1"></div>
+        <div class="ambient-blob ambient-blob-2"></div>
+        <div class="ambient-blob ambient-blob-3"></div>
+    </div>
+
     <div class="absolute top-6 right-6 z-10 flex items-center gap-4 transition-opacity duration-300"
          :class="controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'">
         <button x-on:click="toggleFullscreen()" class="text-aux-faint hover:text-aux-text">
@@ -54,7 +60,7 @@
         </span>
     </div>
 
-    <div class="flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
+    <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
         <div class="w-72 h-72 max-w-full aspect-square rounded-2xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border flex items-center justify-center overflow-hidden shadow-2xl shadow-aux-accent/10">
             @if ($this->nowPlaying?->album_art_url)
                 <img src="{{ $this->nowPlaying->album_art_url }}" class="w-full h-full object-cover" alt="">
