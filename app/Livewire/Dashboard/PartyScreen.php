@@ -68,6 +68,6 @@ class PartyScreen extends Component
         );
 
         return view('livewire.dashboard.party')
-            ->layout('layouts.room', ['title' => $this->room->name.' · Party screen']);
+            ->layout('layouts.room', ['title' => 'Party screen']);
     }
 }

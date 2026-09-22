@@ -21,6 +21,7 @@
     },
     "dependencies": {
         "laravel-echo": "^2.5.0",
+        "leaflet": "^1.9.4",
         "pusher-js": "^8.6.0"
     }
 }

@@ -86,26 +86,8 @@
 
 <div class="flex flex-col items-center gap-4">
 
-    {{-- Room name: the room's core identity, goes first --}}
-    <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col">
-        <span class="w-9 h-9 rounded-full bg-aux-accent-soft text-aux-accent flex items-center justify-center shrink-0">
-            <x-icon name="cog" class="w-4 h-4" />
-        </span>
-        <p class="mt-3 font-medium text-sm">Room name</p>
-        <p class="text-xs text-aux-faint mt-1">What guests see when they join.</p>
-
-        <input type="text" wire:model="editRoomName"
-               class="mt-3 w-full rounded-md bg-aux-card-hover border border-aux-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-aux-accent">
-
-        <div class="mt-3 pt-3 border-t border-aux-border flex items-center justify-end">
-            <button wire:click="saveRoomDetails" class="px-4 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium">
-                Save
-            </button>
-        </div>
-    </div>
-
-    {{-- Location restriction: the toggle plus the radius it enforces --}}
-    <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col">
+    {{-- Location restriction: the toggle, a live map to see/set the boundary, and the radius it enforces --}}
+    <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col" wire:key="location-map-card">
         <div class="flex items-center justify-between">
             <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 {{ $room->location_enforced ? 'bg-aux-accent-soft text-aux-accent' : 'bg-white/5 text-aux-faint' }}">
                 <x-icon name="map-pin" class="w-4 h-4" />
@@ -119,19 +101,60 @@
         <p class="mt-3 font-medium text-sm">Location restriction</p>
         <p class="text-xs text-aux-faint mt-1">Guests must be within the radius to control playback.</p>
 
-        <div class="mt-3 {{ $room->location_enforced ? '' : 'opacity-40' }}">
-            <label class="text-[10px] uppercase tracking-wide text-aux-faint">Radius</label>
+        {{-- Everything below is client-owned: Livewire renders it once and never touches it again
+             (wire:ignore), because re-evaluating x-data on every poll/save would throw away the
+             live Leaflet map instance and Alpine state held in its closure. --}}
+        <div class="mt-3" wire:ignore
+             x-data="locationMap({{ $room->location_lat ?? 'null' }}, {{ $room->location_lng ?? 'null' }}, {{ $room->location_radius_m ?? 250 }})">
+            {{-- relative + z-0 caps Leaflet's internal panes/controls (which use z-index up to
+                 1000) inside their own stacking context, so they can't render above modals
+                 elsewhere on the page that use lower Tailwind z-index utilities. --}}
+            <div class="relative z-0 rounded-lg overflow-hidden border border-aux-border">
+                <div x-ref="mapEl" class="w-full h-48"></div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2 flex-wrap">
+                <button type="button" @click="useMyLocation()" :disabled="locating"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium disabled:opacity-50">
+                    <x-icon name="locate" class="w-3.5 h-3.5" />
+                    <span x-text="locating ? 'Locating…' : 'Use my current location'"></span>
+                </button>
+                <button type="button" @click="manualOpen = !manualOpen"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium">
+                    Enter coordinates
+                </button>
+            </div>
+
+            <p class="mt-2 text-[11px] text-red-400" x-show="locateError" x-text="locateError" x-cloak></p>
+            <p class="mt-2 text-[11px] text-aux-faint" x-show="hasPosition" x-cloak>
+                Pin at <span x-text="lat !== null ? lat.toFixed(5) : ''"></span>, <span x-text="lng !== null ? lng.toFixed(5) : ''"></span>. Click or drag the pin on the map to adjust.
+            </p>
+            <p class="mt-2 text-[11px] text-aux-faint" x-show="!hasPosition" x-cloak>
+                No location set yet. Use your current location, click the map, or enter coordinates below.
+            </p>
+
+            <div class="mt-3 grid grid-cols-2 gap-2" x-show="manualOpen" x-cloak x-transition>
+                <input type="number" step="0.000001" placeholder="Latitude" x-model="manualLat"
+                       class="rounded-md bg-aux-card-hover border border-aux-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-aux-accent">
+                <input type="number" step="0.000001" placeholder="Longitude" x-model="manualLng"
+                       class="rounded-md bg-aux-card-hover border border-aux-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-aux-accent">
+                <button type="button" @click="applyManual()" class="col-span-2 px-3 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium">
+                    Set pin from coordinates
+                </button>
+            </div>
+
+            <label class="mt-3 block text-[10px] uppercase tracking-wide text-aux-faint">Radius</label>
             <div class="mt-0.5 relative w-28">
-                <input type="number" min="10" max="5000" wire:model="editRadius"
+                <input type="number" min="10" max="5000" x-model.number="radius"
                        class="w-full rounded-md bg-aux-card-hover border border-aux-border pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-aux-accent">
                 <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-aux-faint">m</span>
             </div>
-        </div>
 
-        <div class="mt-3 pt-3 border-t border-aux-border flex items-center justify-end">
-            <button wire:click="saveRoomDetails" class="px-4 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium">
-                Save
-            </button>
+            <div class="mt-3 pt-3 border-t border-aux-border flex items-center justify-end">
+                <button type="button" @click="save()" class="px-4 py-1.5 rounded-md bg-aux-card-hover hover:bg-white/10 text-xs font-medium">
+                    Save location
+                </button>
+            </div>
         </div>
     </div>
 

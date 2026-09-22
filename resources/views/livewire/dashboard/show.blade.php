@@ -9,7 +9,7 @@
         </span>
         <h1 class="mt-5 text-xl font-semibold">Waiting for the host to let you in</h1>
         <p class="mt-2 text-sm text-aux-muted max-w-sm">
-            {{ $room->name }} is a private room. You'll join automatically as soon as the host approves your request. No need to refresh.
+            This is a private room. You'll join automatically as soon as the host approves your request. No need to refresh.
         </p>
         <button wire:click="leaveRoom" class="mt-6 text-sm text-aux-muted underline">Cancel and leave</button>
     </div>
@@ -48,7 +48,7 @@
         @if ($room->location_enforced && ! $this->member->passesLocationCheck())
             <div class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center justify-between gap-3">
                 <span>This room requires you to be nearby to control playback.</span>
-                <button type="button" @click="verify()" class="shrink-0 px-3 py-1.5 bg-amber-400 text-amber-950 rounded-full text-[11px] font-semibold">
+                <button type="button" @click="openPrompt()" class="shrink-0 px-3 py-1.5 bg-amber-400 text-amber-950 rounded-full text-[11px] font-semibold">
                     Verify my location
                 </button>
             </div>
@@ -226,6 +226,82 @@
         </div>
     @endif
 
+    {{-- Location verification popup: explains why before the native browser
+         permission prompt appears, and handles denied/out-of-range outcomes
+         in-app instead of a bare alert(). Driven entirely by Alpine state fed
+         from the location-status event dispatched on every render. --}}
+    <div x-show="showPrompt" x-cloak class="fixed inset-0 z-40 flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="promptStatus === 'idle' && closePrompt()"></div>
+        <div class="relative w-full max-w-sm bg-aux-card border border-aux-border rounded-xl p-6 text-center">
+            <span class="inline-flex w-11 h-11 rounded-full items-center justify-center bg-aux-accent-soft text-aux-accent">
+                <x-icon name="map-pin" class="w-5 h-5" />
+            </span>
+
+            <template x-if="promptStatus === 'idle' || promptStatus === 'locating'">
+                <div>
+                    <p class="mt-4 text-sm text-aux-text">
+                        The host requires guests to be nearby to control playback. We'll ask your browser for your location just to check the distance. We don't track or store your movement.
+                    </p>
+                    <div class="mt-5 flex items-center gap-3">
+                        <button @click="closePrompt()" class="flex-1 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-aux-card-hover">
+                            Not now
+                        </button>
+                        <button @click="requestLocation()" :disabled="promptStatus === 'locating'"
+                                class="flex-1 py-2 rounded-full text-sm font-semibold bg-aux-accent text-black hover:bg-aux-accent-strong disabled:opacity-50">
+                            <span x-text="promptStatus === 'locating' ? 'Locating…' : 'Share my location'"></span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="promptStatus === 'checking'">
+                <p class="mt-4 text-sm text-aux-text">Checking your distance&hellip;</p>
+            </template>
+
+            <template x-if="promptStatus === 'out-of-range'">
+                <div>
+                    <p class="mt-4 text-sm text-aux-text">You're outside the room's area. Move closer and try again.</p>
+                    <div class="mt-5 flex items-center gap-3">
+                        <button @click="closePrompt()" class="flex-1 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-aux-card-hover">
+                            Close
+                        </button>
+                        <button @click="requestLocation()" class="flex-1 py-2 rounded-full text-sm font-semibold bg-aux-accent text-black hover:bg-aux-accent-strong">
+                            Try again
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="promptStatus === 'denied'">
+                <div>
+                    <p class="mt-4 text-sm text-aux-text">Location access is blocked for this site. Enable it from your browser's site settings (usually the padlock or info icon next to the address bar), then try again.</p>
+                    <div class="mt-5 flex items-center gap-3">
+                        <button @click="closePrompt()" class="flex-1 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-aux-card-hover">
+                            Close
+                        </button>
+                        <button @click="requestLocation()" class="flex-1 py-2 rounded-full text-sm font-semibold bg-aux-accent text-black hover:bg-aux-accent-strong">
+                            Try again
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="promptStatus === 'unsupported' || promptStatus === 'error'">
+                <div>
+                    <p class="mt-4 text-sm text-aux-text">Couldn't get a location fix. Check your device's location settings and try again.</p>
+                    <div class="mt-5 flex items-center gap-3">
+                        <button @click="closePrompt()" class="flex-1 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-aux-card-hover">
+                            Close
+                        </button>
+                        <button @click="requestLocation()" class="flex-1 py-2 rounded-full text-sm font-semibold bg-aux-accent text-black hover:bg-aux-accent-strong">
+                            Try again
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
     {{-- Playlist picker — search or browse, then pick one to play immediately --}}
     @if ($showPlaylistPicker)
         <div class="fixed inset-0 z-40 flex items-center justify-center px-4">
@@ -286,26 +362,228 @@
 <script>
     function roomLocation() {
         return {
-            init() {},
-            verify() {
-                navigator.geolocation.getCurrentPosition((pos) => {
-                    @this.call('verifyLocation', pos.coords.latitude, pos.coords.longitude);
-                }, () => {
-                    alert('Could not get your location.');
-                });
+            enforced: false,
+            verified: true,
+            showPrompt: false,
+            // idle | locating | checking | out-of-range | denied | unsupported | error
+            promptStatus: 'idle',
+            recheckTimer: null,
+            seenPromptForCurrentRequirement: false,
+
+            init() {
+                window.addEventListener('location-status', (e) => this.onLocationStatus(e.detail));
             },
-            setBoundary() {
-                navigator.geolocation.getCurrentPosition((pos) => {
-                    const radius = prompt('Radius in meters?', '{{ $room->location_radius_m ?? 250 }}');
-                    if (radius) {
-                        @this.call('setLocationBoundary', pos.coords.latitude, pos.coords.longitude, parseInt(radius, 10));
+
+            onLocationStatus({ enforced, verified }) {
+                const nowRequired = enforced && ! verified;
+
+                if (nowRequired && ! this.seenPromptForCurrentRequirement) {
+                    // Fires once per "became required" transition — room just
+                    // got enforced, or a stale verification lapsed — not on
+                    // every 3s poll while the guest is deciding what to do.
+                    this.showPrompt = true;
+                    this.promptStatus = 'idle';
+                    this.seenPromptForCurrentRequirement = true;
+                } else if (nowRequired && this.promptStatus === 'checking') {
+                    // We just asked the server to verify; still not passing
+                    // means permission succeeded but they're outside the radius.
+                    this.promptStatus = 'out-of-range';
+                }
+
+                if (! nowRequired) {
+                    this.seenPromptForCurrentRequirement = false;
+                    if (verified) {
+                        this.showPrompt = false;
+                        this.promptStatus = 'idle';
                     }
-                }, () => {
-                    alert('Could not get your location.');
-                });
+                }
+
+                this.enforced = enforced;
+                this.verified = verified;
+                this.syncRecheckTimer();
             },
+
+            syncRecheckTimer() {
+                const shouldRun = this.enforced && this.verified;
+
+                if (shouldRun && ! this.recheckTimer) {
+                    this.recheckTimer = setInterval(() => this.recheck(), 30000);
+                } else if (! shouldRun && this.recheckTimer) {
+                    clearInterval(this.recheckTimer);
+                    this.recheckTimer = null;
+                }
+            },
+
+            recheck() {
+                if (! navigator.geolocation) {
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    @this.call('verifyLocation', pos.coords.latitude, pos.coords.longitude, true);
+                }, () => {
+                    // Silent: a single missed re-check doesn't revoke access,
+                    // the freshness window handles sustained absence.
+                }, { timeout: 10000, maximumAge: 20000 });
+            },
+
+            openPrompt() {
+                this.showPrompt = true;
+                this.promptStatus = 'idle';
+            },
+
+            closePrompt() {
+                this.showPrompt = false;
+            },
+
+            requestLocation() {
+                if (! navigator.geolocation) {
+                    this.promptStatus = 'unsupported';
+                    return;
+                }
+                this.promptStatus = 'locating';
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    this.promptStatus = 'checking';
+                    @this.call('verifyLocation', pos.coords.latitude, pos.coords.longitude);
+                }, (err) => {
+                    this.promptStatus = err.code === err.PERMISSION_DENIED ? 'denied' : 'error';
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            },
+
             copyLink() {
                 navigator.clipboard.writeText('{{ route('join', ['code' => $room->invite_code]) }}');
+            },
+        };
+    }
+
+    function locationMap(initialLat, initialLng, initialRadius) {
+        let map, marker, circle;
+        const defaultCenter = [52.3676, 4.9041]; // Amsterdam, used only when no location is set yet
+
+        const pinIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:16px;height:16px;border-radius:50%;background:#1db954;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+        });
+
+        return {
+            lat: initialLat,
+            lng: initialLng,
+            radius: initialRadius,
+            manualLat: '',
+            manualLng: '',
+            manualOpen: false,
+            locating: false,
+            locateError: '',
+
+            init() {
+                const el = this.$refs.mapEl;
+                if (! el) {
+                    return;
+                }
+
+                // Livewire may re-run this init (e.g. after a wire:click elsewhere triggers a
+                // morph) even though this whole subtree is wire:ignore'd, producing a fresh
+                // Alpine data object with an empty closure. Rather than fight that, cache the
+                // real Leaflet instance on the DOM node itself and reattach to it, resyncing
+                // Alpine's reactive state from the map (the actual source of truth) instead of
+                // rebuilding it and losing whatever the user had set.
+                if (el._auxLeaflet) {
+                    ({ map, marker, circle } = el._auxLeaflet);
+                    const pos = marker.getLatLng();
+                    this.lat = pos.lat;
+                    this.lng = pos.lng;
+                    this.radius = circle.getRadius();
+                } else {
+                    const center = this.hasPosition ? [this.lat, this.lng] : defaultCenter;
+
+                    map = L.map(el, { attributionControl: true }).setView(center, this.hasPosition ? 15 : 12);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                        maxZoom: 19,
+                    }).addTo(map);
+
+                    marker = L.marker(center, { draggable: true, icon: pinIcon, opacity: this.hasPosition ? 1 : 0.001 }).addTo(map);
+                    circle = L.circle(center, {
+                        radius: this.radius,
+                        color: '#1db954',
+                        fillColor: '#1db954',
+                        weight: 1.5,
+                        opacity: this.hasPosition ? 1 : 0,
+                        fillOpacity: this.hasPosition ? 0.12 : 0,
+                    }).addTo(map);
+
+                    el._auxLeaflet = { map, marker, circle };
+
+                    setTimeout(() => map.invalidateSize(), 50);
+                }
+
+                marker.off('dragend').on('dragend', () => {
+                    const pos = marker.getLatLng();
+                    this.setPosition(pos.lat, pos.lng, false);
+                });
+
+                map.off('click').on('click', (e) => this.setPosition(e.latlng.lat, e.latlng.lng, true));
+
+                this.$watch('radius', (value) => {
+                    const r = parseInt(value, 10);
+                    if (! isNaN(r) && r > 0) {
+                        circle.setRadius(r);
+                    }
+                });
+            },
+
+            setPosition(lat, lng, recenter) {
+                this.lat = lat;
+                this.lng = lng;
+                this.locateError = '';
+                marker.setLatLng([lat, lng]).setOpacity(1);
+                circle.setLatLng([lat, lng]).setStyle({ opacity: 1, fillOpacity: 0.12 });
+                if (recenter) {
+                    map.setView([lat, lng], Math.max(map.getZoom(), 15));
+                }
+            },
+
+            useMyLocation() {
+                if (! navigator.geolocation) {
+                    this.locateError = 'Geolocation is not supported by this browser.';
+                    return;
+                }
+                this.locating = true;
+                this.locateError = '';
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    this.locating = false;
+                    this.setPosition(pos.coords.latitude, pos.coords.longitude, true);
+                }, () => {
+                    this.locating = false;
+                    this.locateError = 'Could not get your location. Drop the pin on the map or enter coordinates below.';
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            },
+
+            applyManual() {
+                const lat = parseFloat(this.manualLat);
+                const lng = parseFloat(this.manualLng);
+                if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                    this.locateError = 'Enter a valid latitude (-90 to 90) and longitude (-180 to 180).';
+                    return;
+                }
+                this.setPosition(lat, lng, true);
+                this.manualLat = '';
+                this.manualLng = '';
+                this.manualOpen = false;
+            },
+
+            save() {
+                if (! this.hasPosition) {
+                    this.locateError = 'Set a location first.';
+                    return;
+                }
+                @this.call('setLocationBoundary', this.lat, this.lng, parseInt(this.radius, 10));
+            },
+
+            get hasPosition() {
+                return this.lat !== null && this.lng !== null;
             },
         };
     }

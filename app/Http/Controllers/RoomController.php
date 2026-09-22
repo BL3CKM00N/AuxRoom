@@ -30,7 +30,6 @@ class RoomController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
             'is_private' => ['nullable', 'boolean'],
             'location_enforced' => ['nullable', 'boolean'],
             'location_lat' => ['nullable', 'numeric', 'between:-90,90'],
@@ -43,7 +42,6 @@ class RoomController extends Controller
         } while (Room::where('invite_code', $code)->exists());
 
         $room = Room::create([
-            'name' => $validated['name'],
             'invite_code' => $code,
             'host_id' => $request->user()->id,
             'playback_provider_id' => $request->user()->id,

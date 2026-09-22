@@ -11,7 +11,6 @@ use Illuminate\Support\Str;
 class Room extends Model
 {
     protected $fillable = [
-        'name',
         'invite_code',
         'host_id',
         'playback_provider_id',
@@ -194,10 +193,14 @@ class Room extends Model
         return $earthRadius * $c;
     }
 
-    public function isWithinBoundary(float $lat, float $lng): bool
+    /**
+     * $bufferMeters adds slack to the radius for periodic re-checks, so ordinary
+     * GPS drift near the edge doesn't flap a guest in and out of range.
+     */
+    public function isWithinBoundary(float $lat, float $lng, int $bufferMeters = 0): bool
     {
         $distance = $this->distanceToMeters($lat, $lng);
 
-        return $distance === null || $distance <= $this->location_radius_m;
+        return $distance === null || $distance <= $this->location_radius_m + $bufferMeters;
     }
 }

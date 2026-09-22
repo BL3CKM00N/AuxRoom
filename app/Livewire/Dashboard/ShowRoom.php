@@ -37,10 +37,6 @@ class ShowRoom extends Component
     #[Url(as: 'tab')]
     public string $activeTab = 'hub';
 
-    public string $editRoomName = '';
-
-    public int $editRadius = 250;
-
     public ?string $confirmAction = null;
 
     /** @var array<int, mixed> */
@@ -84,8 +80,6 @@ class ShowRoom extends Component
 
         $found->update(['last_seen_at' => now()]);
         $this->memberId = $found->id;
-        $this->editRoomName = $room->name;
-        $this->editRadius = $room->location_radius_m ?? 250;
 
         if (! request()->has('tab')) {
             $this->activeTab = $found->isHost() ? 'hub' : 'queue';
@@ -95,36 +89,6 @@ class ShowRoom extends Component
     public function setTab(string $tab): void
     {
         $this->activeTab = $tab;
-    }
-
-    public function saveRoomDetails(): void
-    {
-        if (! $this->isHost) {
-            return;
-        }
-
-        $validated = $this->validate([
-            'editRoomName' => ['required', 'string', 'max:255'],
-            'editRadius' => ['required', 'integer', 'min:10', 'max:5000'],
-        ]);
-
-        $nameChanged = $validated['editRoomName'] !== $this->room->name;
-        $radiusChanged = $validated['editRadius'] !== $this->room->location_radius_m;
-
-        $this->room->update([
-            'name' => $validated['editRoomName'],
-            'location_radius_m' => $validated['editRadius'],
-        ]);
-
-        if ($nameChanged) {
-            $this->logActivity('settings', "Room renamed to \"{$validated['editRoomName']}\".");
-        }
-
-        if ($radiusChanged) {
-            $this->logActivity('settings', "Location radius set to {$validated['editRadius']}m.");
-        }
-
-        $this->broadcastUpdate('settings');
     }
 
     /**
@@ -1120,12 +1084,23 @@ class ShowRoom extends Component
         }
     }
 
-    public function verifyLocation(float $lat, float $lng): void
+    /**
+     * $isRecheck marks a silent background re-verification (see the ~30s client
+     * interval in show.blade.php): it uses a buffered radius to avoid GPS-jitter
+     * flapping at the edge, and never surfaces an error on failure — it just
+     * skips refreshing the timestamp, letting passesLocationCheck()'s freshness
+     * window re-gate the guest naturally if they don't check back in.
+     */
+    public function verifyLocation(float $lat, float $lng, bool $isRecheck = false): void
     {
-        if ($this->room->isWithinBoundary($lat, $lng)) {
+        if ($this->room->isWithinBoundary($lat, $lng, $isRecheck ? 20 : 0)) {
             $this->member->update(['location_verified_at' => now()]);
             $this->controlError = '';
-        } else {
+
+            return;
+        }
+
+        if (! $isRecheck) {
             $this->controlError = 'You need to be closer to the room to control playback.';
         }
     }
@@ -1356,6 +1331,11 @@ class ShowRoom extends Component
             volumePercent: $this->room->volume_percent,
         );
 
+        $this->dispatch('location-status',
+            enforced: $this->room->location_enforced,
+            verified: $this->isHost || $this->member->passesLocationCheck(),
+        );
+
         $view = view('livewire.dashboard.show');
 
         // Hosts get the same app shell (navbar, dropdown, hamburger) as every
@@ -1365,6 +1345,6 @@ class ShowRoom extends Component
             return $view->layout('layouts.app');
         }
 
-        return $view->layout('layouts.room', ['title' => $this->room->name]);
+        return $view->layout('layouts.room', ['title' => 'Room']);
     }
 }

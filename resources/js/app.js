@@ -8,6 +8,11 @@
 
 import './echo';
 
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+window.L = L;
+
 /**
  * Drives the now-playing progress slider smoothly between server syncs.
  * The server only knows position via a wall-clock diff and only pushes it

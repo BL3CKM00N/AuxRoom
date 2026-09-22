@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RoomMember extends Model
 {
+    /**
+     * How long a location verification stays valid before the guest must be
+     * re-checked. Paired with the client's ~30s recheck interval so a couple
+     * of missed beats (backgrounded tab, brief signal loss) don't revoke
+     * access, but someone who genuinely stops checking in eventually does.
+     */
+    private const LOCATION_FRESHNESS_SECONDS = 90;
+
     protected $fillable = [
         'room_id',
         'user_id',
@@ -87,6 +95,11 @@ class RoomMember extends Model
             return true;
         }
 
-        return $this->isHost() || $this->location_exempt || $this->location_verified_at !== null;
+        if ($this->isHost() || $this->location_exempt) {
+            return true;
+        }
+
+        return $this->location_verified_at !== null
+            && $this->location_verified_at->gt(now()->subSeconds(self::LOCATION_FRESHNESS_SECONDS));
     }
 }
