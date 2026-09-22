@@ -1086,10 +1086,14 @@ class ShowRoom extends Component
 
     /**
      * $isRecheck marks a silent background re-verification (see the ~30s client
-     * interval in show.blade.php): it uses a buffered radius to avoid GPS-jitter
-     * flapping at the edge, and never surfaces an error on failure — it just
-     * skips refreshing the timestamp, letting passesLocationCheck()'s freshness
-     * window re-gate the guest naturally if they don't check back in.
+     * interval, and the immediate one it triggers on a boundary change, in
+     * show.blade.php): it uses a buffered radius to avoid GPS-jitter flapping
+     * at the edge, and never surfaces an error on failure — but it does
+     * actively revoke the stale verification (rather than just leaving it to
+     * decay via passesLocationCheck()'s freshness window), so a host moving
+     * the boundary takes effect within one recheck instead of up to ~2
+     * minutes. The freshness window still stands as a fallback for when
+     * rechecks stop happening at all (backgrounded tab, lost signal).
      */
     public function verifyLocation(float $lat, float $lng, bool $isRecheck = false): void
     {
@@ -1100,9 +1104,13 @@ class ShowRoom extends Component
             return;
         }
 
-        if (! $isRecheck) {
-            $this->controlError = 'You need to be closer to the room to control playback.';
+        if ($isRecheck) {
+            $this->member->update(['location_verified_at' => null]);
+
+            return;
         }
+
+        $this->controlError = 'You need to be closer to the room to control playback.';
     }
 
     public function leaveRoom()
@@ -1334,6 +1342,12 @@ class ShowRoom extends Component
         $this->dispatch('location-status',
             enforced: $this->room->location_enforced,
             verified: $this->isHost || $this->member->passesLocationCheck(),
+            // Lets the guest's browser notice the host moved the boundary and
+            // react immediately instead of waiting for the next scheduled
+            // recheck — see roomLocation() in show.blade.php.
+            boundary: $this->room->hasLocationBoundary()
+                ? "{$this->room->location_lat},{$this->room->location_lng},{$this->room->location_radius_m}"
+                : null,
         );
 
         $view = view('livewire.dashboard.show');
@@ -1345,6 +1359,6 @@ class ShowRoom extends Component
             return $view->layout('layouts.app');
         }
 
-        return $view->layout('layouts.room', ['title' => 'Room']);
+        return $view->layout('layouts.room', ['title' => 'Room', 'padTop' => true]);
     }
 }

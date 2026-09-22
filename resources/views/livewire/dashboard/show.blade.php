@@ -1,4 +1,4 @@
-<div wire:poll.3s="heartbeat" x-data="roomLocation()" x-init="init()" class="min-h-screen flex flex-col bg-aux-bg text-aux-text">
+<div wire:poll.3s="heartbeat" x-data="roomLocation()" x-init="init()" class="flex-1 flex flex-col bg-aux-bg text-aux-text">
 
 @if (! $this->isApproved)
 
@@ -22,11 +22,7 @@
         <livewire:layout.navigation :room="$room" :member-id="$memberId" />
     @endunless
 
-    {{-- The nav is fixed (see navigation.blade.php), so guests need top
-         padding to compensate for the space it no longer occupies in flow;
-         hosts get theirs from layouts.app instead, where the nav actually
-         lives for them, so this only applies here. --}}
-    <div class="flex-1 flex flex-col min-w-0 {{ $this->isHost ? '' : 'pt-16' }}">
+    <div class="flex-1 flex flex-col min-w-0">
 
         @if ($this->isMock)
             <div class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-lg bg-aux-accent-soft border border-aux-accent/20 flex items-center justify-between gap-3 text-xs">
@@ -373,13 +369,24 @@
             promptStatus: 'idle',
             recheckTimer: null,
             seenPromptForCurrentRequirement: false,
+            lastBoundary: null,
 
             init() {
                 window.addEventListener('location-status', (e) => this.onLocationStatus(e.detail));
             },
 
-            onLocationStatus({ enforced, verified }) {
+            onLocationStatus({ enforced, verified, boundary }) {
                 const nowRequired = enforced && ! verified;
+
+                // The host moved/changed the boundary — re-check against it
+                // right away instead of waiting for the next scheduled ~30s
+                // recheck (up to ~2 minutes with the freshness window on top).
+                // Skipped on the very first event, since there's nothing to
+                // compare against yet and the normal verify flow handles that.
+                if (this.lastBoundary !== null && boundary !== null && boundary !== this.lastBoundary && this.verified) {
+                    this.recheck();
+                }
+                this.lastBoundary = boundary;
 
                 if (nowRequired && ! this.seenPromptForCurrentRequirement) {
                     // Fires once per "became required" transition — room just

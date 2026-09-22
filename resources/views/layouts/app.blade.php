@@ -17,7 +17,14 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased bg-aux-bg text-aux-text">
-        <div class="min-h-screen bg-aux-bg pt-16">
+        {{-- flex flex-col (not just min-h-screen) so <main> can be flex-1 and
+             stretch to fill the remaining height: the room dashboard's own
+             root relies on that instead of redeclaring min-h-screen itself,
+             which previously compounded with this wrapper's min-h-screen and
+             left short pages with ~4rem of dead, pointless scroll (nav is
+             fixed now, so unlike before that scroll no longer reveals
+             anything — it just felt broken). --}}
+        <div class="min-h-screen flex flex-col bg-aux-bg pt-16">
             <livewire:layout.navigation />
 
             <!-- Page Heading -->
@@ -30,7 +37,7 @@
             @endif
 
             <!-- Page Content -->
-            <main>
+            <main class="flex-1 flex flex-col">
                 {{ $slot }}
             </main>
         </div>

@@ -33,7 +33,7 @@
      x-on:mousemove.window="resetIdleTimer()"
      x-on:touchstart.window="resetIdleTimer()"
      :class="controlsVisible ? '' : 'cursor-none'"
-     class="min-h-screen bg-aux-bg text-aux-text flex flex-col relative">
+     class="flex-1 bg-aux-bg text-aux-text flex flex-col relative">
 
     <div class="ambient-glow" aria-hidden="true">
         <div class="ambient-blob ambient-blob-1"></div>
