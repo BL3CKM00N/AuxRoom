@@ -8,11 +8,18 @@
 
 html {
     background-color: #0a0d12;
+    /* Belt-and-suspenders alongside the viewport meta tag's user-scalable=no:
+       blocks pinch-zoom and double-tap-zoom at the CSS layer too, and pan-y
+       only allows vertical panning, so a stray horizontal swipe (or any
+       residual overflow from a layout bug) can't scroll the page sideways. */
+    touch-action: pan-y;
+    overflow-x: hidden;
 }
 
 body {
     background-color: #0a0d12;
     color: #f5f7fa;
+    overflow-x: hidden;
 }
 
 ::-webkit-scrollbar {
