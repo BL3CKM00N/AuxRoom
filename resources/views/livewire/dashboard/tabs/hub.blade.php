@@ -55,7 +55,11 @@
             <button type="button" @click="copyLink()" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-aux-accent text-black text-sm font-semibold hover:bg-aux-accent-strong">
                 <x-icon name="copy" class="w-4 h-4" /> Copy invite link
             </button>
+            {{-- window.open() (not a plain target="_blank" link) so the tab is
+                 script-opened — its own X button calls window.close(), which
+                 browsers silently refuse on a tab they didn't open via script. --}}
             <a href="{{ route('rooms.party', $room) }}" target="_blank"
+               onclick="window.open(this.href, '_blank'); return false;"
                class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-aux-card-hover">
                 <x-icon name="tv" class="w-4 h-4" /> Launch party screen
             </a>

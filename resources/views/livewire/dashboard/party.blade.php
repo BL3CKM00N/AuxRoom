@@ -19,11 +19,15 @@
             this.hideTimer = setTimeout(() => { this.controlsVisible = false; }, 5000);
         },
         toggleFullscreen() {
-            if (! document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
+            const request = document.fullscreenElement
+                ? document.exitFullscreen()
+                : document.documentElement.requestFullscreen();
+
+            // Browsers can refuse this (permissions policy, an already-pending
+            // request, etc.) — catch it so a rejected promise doesn't surface
+            // as an unrelated-looking console error with no indication it
+            // came from this button.
+            request.catch((e) => console.warn('Fullscreen toggle failed:', e));
         },
      }"
      x-init="
@@ -41,9 +45,23 @@
         <div class="ambient-blob ambient-blob-3"></div>
     </div>
 
-    <div class="absolute top-6 right-6 z-10 flex items-center gap-4 transition-opacity duration-300"
-         :class="controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'">
-        <button x-on:click="toggleFullscreen()" class="text-aux-faint hover:text-aux-text">
+    {{-- No pointer-events-none here: the only thing that brings faded
+         controls back is a mousemove, so if the cursor is already resting on
+         a button and the user just clicks (no movement first), a
+         pointer-events-none control would swallow that click entirely —
+         it's still "invisible" at that instant, and passes the click
+         through to whatever's behind it instead of the button. Fading via
+         opacity alone keeps them clickable at their known position even
+         while faded. --}}
+    {{-- z-20, not z-10: the centered content block below is also z-10 and
+         comes later in the DOM, so on a z-index tie it painted on top of
+         these corner controls and silently ate every click aimed at them —
+         regardless of the idle-timer/opacity state above. --}}
+    <div class="absolute top-6 right-6 z-20 flex items-center gap-4 transition-opacity duration-300"
+         :class="controlsVisible ? 'opacity-100' : 'opacity-0'">
+        {{-- Fullscreen API isn't supported on mobile browsers (iOS Safari
+             doesn't implement it at all), so the button is desktop-only. --}}
+        <button x-on:click="toggleFullscreen()" class="hidden sm:block text-aux-faint hover:text-aux-text">
             <x-icon name="expand" class="w-6 h-6" x-show="! isFullscreen" />
             <x-icon name="collapse" class="w-6 h-6" x-show="isFullscreen" x-cloak />
         </button>
@@ -54,40 +72,40 @@
 
     {{-- Listener count moves to the opposite corner on mobile, where the
          QR/invite block is a popup trigger instead of sitting inline. --}}
-    <div class="sm:hidden absolute top-6 left-6 z-10">
+    <div class="sm:hidden absolute top-6 left-6 z-20">
         <span class="inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
             <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
         </span>
     </div>
 
     <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
-        <div class="w-72 h-72 max-w-full aspect-square rounded-2xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border flex items-center justify-center overflow-hidden shadow-2xl shadow-aux-accent/10">
+        <div class="w-72 h-72 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] max-w-full aspect-square rounded-2xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border flex items-center justify-center overflow-hidden shadow-2xl shadow-aux-accent/10">
             @if ($this->nowPlaying?->album_art_url)
                 <img src="{{ $this->nowPlaying->album_art_url }}" class="w-full h-full object-cover" alt="">
             @else
-                <x-icon name="note" class="w-16 h-16 text-aux-faint" />
+                <x-icon name="note" class="w-16 h-16 lg:w-20 lg:h-20 text-aux-faint" />
             @endif
         </div>
 
-        <p class="mt-8 text-xs font-semibold uppercase tracking-widest text-aux-accent">
+        <p class="mt-8 text-xs lg:text-sm font-semibold uppercase tracking-widest text-aux-accent">
             {{ $this->nowPlaying ? 'Currently spinning' : 'Waiting for the first track' }}
         </p>
-        <h1 class="mt-2 text-4xl sm:text-5xl font-bold max-w-3xl">{{ $this->nowPlaying->name ?? 'AuxRoom' }}</h1>
-        <p class="mt-3 text-xl text-aux-muted">{{ $this->nowPlaying->artist ?? 'Scan the code to join and add a song' }}</p>
+        <h1 class="mt-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold max-w-3xl lg:max-w-5xl">{{ $this->nowPlaying->name ?? 'AuxRoom' }}</h1>
+        <p class="mt-3 text-xl lg:text-2xl xl:text-3xl text-aux-muted">{{ $this->nowPlaying->artist ?? 'Scan the code to join and add a song' }}</p>
 
         @if ($this->nowPlaying)
-            <span class="mt-4 inline-flex px-2.5 py-1 rounded-full bg-white/5 text-[11px] font-semibold text-aux-muted">
+            <span class="mt-4 inline-flex px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full bg-white/5 text-[11px] lg:text-sm font-semibold text-aux-muted">
                 {{ $room->is_playing ? 'PLAYING' : 'PAUSED' }}
             </span>
 
-            <div class="mt-6 w-full max-w-sm"
+            <div class="mt-6 w-full max-w-sm lg:max-w-lg xl:max-w-xl"
                  x-data="playbackClock()"
                  x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                  x-on:playback-sync.window="sync($event.detail)">
-                <div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div class="h-1.5 lg:h-2 bg-white/10 rounded-full overflow-hidden">
                     <div class="h-full bg-aux-accent" :style="`width: ${seekPct}%`"></div>
                 </div>
-                <div class="mt-2 flex justify-between text-[11px] text-aux-faint">
+                <div class="mt-2 flex justify-between text-[11px] lg:text-sm text-aux-faint">
                     <span x-text="formatMs(positionMs)"></span>
                     <span x-text="formatMs(durationMs)"></span>
                 </div>
@@ -101,14 +119,14 @@
                 </p>
             </div>
         @elseif ($this->upNext->isNotEmpty())
-            <div class="mt-12 w-full max-w-2xl">
-                <p class="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest text-aux-accent">
+            <div class="mt-12 w-full max-w-2xl lg:max-w-4xl">
+                <p class="flex items-center justify-center gap-2 text-xs lg:text-sm font-semibold uppercase tracking-widest text-aux-accent">
                     <x-icon name="queue-list" class="w-4 h-4" /> Up next
                 </p>
-                <div class="mt-4 flex flex-wrap justify-center gap-3">
+                <div class="mt-4 flex flex-wrap justify-center gap-3 lg:gap-4">
                     @foreach ($this->upNext as $item)
-                        <div class="flex items-center gap-3 pl-2 pr-4 py-2 rounded-xl bg-aux-card border border-aux-border">
-                            <div class="w-9 h-9 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
+                        <div class="flex items-center gap-3 pl-2 pr-4 py-2 lg:pl-3 lg:pr-5 lg:py-3 rounded-xl bg-aux-card border border-aux-border">
+                            <div class="w-9 h-9 lg:w-12 lg:h-12 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
                                 @if ($item->album_art_url)
                                     <img src="{{ $item->album_art_url }}" class="w-full h-full object-cover" alt="">
                                 @else
@@ -116,8 +134,8 @@
                                 @endif
                             </div>
                             <div class="min-w-0 text-left">
-                                <p class="text-sm font-medium truncate max-w-[10rem]">{{ $item->name }}</p>
-                                <p class="text-xs text-aux-faint truncate max-w-[10rem]">{{ $item->artist }}</p>
+                                <p class="text-sm lg:text-base font-medium truncate max-w-[10rem] lg:max-w-[14rem]">{{ $item->name }}</p>
+                                <p class="text-xs lg:text-sm text-aux-faint truncate max-w-[10rem] lg:max-w-[14rem]">{{ $item->artist }}</p>
                             </div>
                         </div>
                     @endforeach
