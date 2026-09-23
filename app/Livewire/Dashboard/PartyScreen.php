@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard;
 
 use App\Models\Room;
+use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\SpotifyClientFactory;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -27,6 +28,13 @@ class PartyScreen extends Component
     public function poll(): void
     {
         $this->room->refresh();
+
+        // Independent of the host's own dashboard tab (see PlaybackSync) —
+        // without this, a Party Screen left open on its own would never
+        // notice a track change at all, not just slowly.
+        if (! $this->room->commandedRecently()) {
+            app(PlaybackSync::class)->sync($this->room);
+        }
     }
 
     public function getNowPlayingProperty(): ?object

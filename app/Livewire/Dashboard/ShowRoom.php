@@ -9,6 +9,7 @@ use App\Models\QueueItem;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
+use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\SpotifyClientFactory;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -35,7 +36,7 @@ class ShowRoom extends Component
     public string $controlError = '';
 
     #[Url(as: 'tab')]
-    public string $activeTab = 'hub';
+    public string $activeTab = 'queue';
 
     public ?string $confirmAction = null;
 
@@ -82,7 +83,7 @@ class ShowRoom extends Component
         $this->memberId = $found->id;
 
         if (! request()->has('tab')) {
-            $this->activeTab = $found->isHost() ? 'hub' : 'queue';
+            $this->activeTab = 'queue';
         }
     }
 
@@ -160,84 +161,15 @@ class ShowRoom extends Component
     }
 
     /**
-     * Detects playback changes made outside AuxRoom — pausing, seeking, or
-     * skipping from the Spotify app itself, or any other Spotify Connect
-     * client — and pulls the room's state back in line with reality. Only
-     * the host polls this, since it's the host's Spotify account being
-     * queried and every viewer's heartbeat would otherwise multiply calls.
+     * Detects playback changes made outside AuxRoom (see PlaybackSync). Only
+     * the host's heartbeat triggers this on the dashboard side, since it's
+     * the host's Spotify account being queried and every guest's heartbeat
+     * would otherwise multiply calls — the Party Screen also triggers its
+     * own copy independently, so it stays live without needing this tab open.
      */
     private function syncWithSpotify(): void
     {
-        if ($this->isMock || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
-            return;
-        }
-
-        $state = app(SpotifyClientFactory::class)->forRoom($this->room)->getPlaybackState();
-
-        if (! $state) {
-            // Nothing playing anywhere on the account at all (not even
-            // paused) — reflect that if the room still thought otherwise.
-            if ($this->room->is_playing) {
-                $this->room->update(['is_playing' => false]);
-                $this->broadcastUpdate('playback');
-            }
-
-            return;
-        }
-
-        // Spotify's own context tells us, authoritatively, whether it's
-        // currently playing from the selected playlist — rather than
-        // trusting a locally-toggled flag that can go stale once native
-        // queue items start interleaving with the underlying context.
-        $isFallbackContext = $this->room->fallback_playlist_uri
-            && $state['context_uri'] === $this->room->fallback_playlist_uri;
-
-        $trackChanged = $state['track_id'] !== $this->room->now_playing_track_id;
-        $queueItemId = $this->room->now_playing_queue_item_id;
-
-        if ($trackChanged) {
-            // Look up whether a guest explicitly queued this, purely for
-            // "added by" attribution — Spotify's own queue/context is the
-            // source of truth for order and content, never reconstructed
-            // locally (that's what caused the queue to go backwards before).
-            $matched = $state['track_id']
-                ? $this->room->queueItems()->where('spotify_track_id', $state['track_id'])->whereNull('played_at')->first()
-                : null;
-
-            $matched?->update(['played_at' => now()]);
-            $queueItemId = $matched?->id;
-
-            if (! $isFallbackContext && ! $matched && $state['track_id']) {
-                $this->logActivity('played', "Now playing from Spotify: \"{$state['name']}\".");
-            }
-        }
-
-        $drifted = abs($state['progress_ms'] - $this->room->currentPositionMs()) > 3000;
-        $playStateChanged = $state['is_playing'] !== $this->room->is_playing;
-        $fallbackFlagChanged = $isFallbackContext !== $this->room->is_playing_fallback;
-        $shuffleChanged = $state['shuffle_enabled'] !== $this->room->shuffle_enabled;
-        $repeatChanged = $state['repeat_mode'] !== $this->room->repeat_mode;
-
-        if (! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
-            return;
-        }
-
-        $this->room->update([
-            'now_playing_queue_item_id' => $queueItemId,
-            'now_playing_track_id' => $state['track_id'],
-            'now_playing_name' => $state['name'],
-            'now_playing_artist' => $state['artist'],
-            'now_playing_album_art_url' => $state['album_art_url'],
-            'now_playing_duration_ms' => $state['duration_ms'],
-            'is_playing_fallback' => $isFallbackContext,
-            'is_playing' => $state['is_playing'],
-            'now_playing_position_ms' => $state['progress_ms'],
-            'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
-            'shuffle_enabled' => $state['shuffle_enabled'],
-            'repeat_mode' => $state['repeat_mode'],
-        ]);
-
-        $this->broadcastUpdate('playback');
+        app(PlaybackSync::class)->sync($this->room, $this->member->id);
     }
 
     /**
@@ -1320,7 +1252,7 @@ class ShowRoom extends Component
 
     private function broadcastUpdate(string $reason): void
     {
-        broadcast(new RoomUpdated($this->room, $reason));
+        RoomUpdated::broadcastFor($this->room, $reason);
     }
 
     public function logout(Logout $logout): mixed
