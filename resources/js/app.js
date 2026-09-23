@@ -7,11 +7,7 @@
  */
 
 import './echo';
-
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-window.L = L;
+import './alpine/room-location';
 
 /**
  * iOS Safari has deliberately ignored the viewport meta tag's
