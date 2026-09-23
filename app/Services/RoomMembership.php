@@ -111,7 +111,7 @@ class RoomMembership
             'message' => "{$member->display_name} joined the room.",
         ]);
 
-        broadcast(new RoomUpdated($room, 'members'));
+        RoomUpdated::broadcastFor($room, 'members');
 
         return $member;
     }
@@ -127,6 +127,6 @@ class RoomMembership
             'message' => "{$member->display_name} left the room.",
         ]);
 
-        broadcast(new RoomUpdated($member->room, 'members'));
+        RoomUpdated::broadcastFor($member->room, 'members');
     }
 }

@@ -22,7 +22,7 @@ class Logout
             ]);
 
             $room->update(['closed_at' => now()]);
-            broadcast(new RoomUpdated($room, 'closed'));
+            RoomUpdated::broadcastFor($room, 'closed');
         }
 
         Auth::guard('web')->logout();
