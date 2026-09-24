@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Square, solid-background source for rasterizing home-screen icons
+     (apple-touch-icon, manifest icons). The glyph itself (favicon.svg) is
+     transparent line art, which iOS renders unpredictably without an opaque
+     backing square, so this wraps it in one sized to the app's dark theme. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#0a0d12"/>
+  <g transform="translate(20,17)">
+    <g fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" transform="translate(-9,-9)">
+      <path d="M 66,43 V 24 A 12,12 0 0 0 54,12 H 24 A 12,12 0 0 0 12,24 v 36 a 12,12 0 0 0 12,12 h 15"/>
+      <path d="M 28,35 V 49 M 41,27 V 57 M 54,39 v 33"/>
+    </g>
+  </g>
+</svg>

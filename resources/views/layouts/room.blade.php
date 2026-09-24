@@ -8,6 +8,7 @@
         <title>{{ $title ?? 'Room' }} · AuxRoom</title>
 
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+        <x-pwa-meta />
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />

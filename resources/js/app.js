@@ -23,6 +23,17 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('gesturechange', (e) => e.preventDefault());
 
 /**
+ * Registered from a stable, unhashed public path (not through Vite) so the
+ * browser can compare it byte-for-byte across visits and so its scope
+ * covers the whole site. See public/sw.js for what it actually does.
+ */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+    });
+}
+
+/**
  * Drives the now-playing progress slider smoothly between server syncs.
  * The server only knows position via a wall-clock diff and only pushes it
  * on actions/heartbeats (every few seconds) — without this, the slider

@@ -8,6 +8,7 @@
         <title>{{ config('app.name', 'AuxRoom') }}</title>
 
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+        <x-pwa-meta />
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
