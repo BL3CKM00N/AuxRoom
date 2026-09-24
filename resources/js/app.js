@@ -8,6 +8,7 @@
 
 import './echo';
 import './alpine/room-location';
+import './alpine/ambient-background';
 
 /**
  * iOS Safari has deliberately ignored the viewport meta tag's

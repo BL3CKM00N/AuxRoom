@@ -39,11 +39,7 @@
      :class="controlsVisible ? '' : 'cursor-none'"
      class="flex-1 bg-aux-bg text-aux-text flex flex-col relative">
 
-    <div class="ambient-glow" aria-hidden="true">
-        <div class="ambient-blob ambient-blob-1"></div>
-        <div class="ambient-blob ambient-blob-2"></div>
-        <div class="ambient-blob ambient-blob-3"></div>
-    </div>
+    <x-ambient-background />
 
     {{-- No pointer-events-none here: the only thing that brings faded
          controls back is a mousemove, so if the cursor is already resting on

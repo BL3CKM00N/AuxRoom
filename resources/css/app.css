@@ -102,76 +102,92 @@ input[type='range']::-moz-range-thumb {
     background: #22c55e;
 }
 
-/* Soft, slow-drifting blurred blobs for the landing page hero. Pure CSS,
-   no JS, so it costs nothing beyond paint.
-
-   `fixed` + viewport-relative (vmax/%) sizing and positioning, rather than
-   an absolute box sized/anchored in rem: a fixed-size box left a visible
-   hard edge around the glow on large monitors (it stopped short of filling
-   the screen), and rem-sized blobs anchored to the viewport's corners on a
-   full-bleed layer drifted away from the centered content on ultra-wide
-   screens. Sizing/positioning as a fraction of the viewport scales with the
-   screen instead, so the glow always fills edge-to-edge and stays roughly
-   where the (centered) content is, at any resolution. */
-.ambient-glow {
+/* Aurora background (the <x-ambient-background /> component): a hand-built
+   SVG "curtain of light" scene, drifting slowly on its own loop. A bit of JS
+   (resources/js/alpine/ambient-background.js) layers a subtle cursor-parallax
+   on top by writing --px/--py onto .green-waves, eased toward the pointer
+   instead of following it 1:1. `position: fixed` so it always fills the
+   viewport regardless of page height. */
+.green-waves {
     position: fixed;
     inset: 0;
     overflow: hidden;
     z-index: 0;
     pointer-events: none;
+    background: radial-gradient(ellipse at 75% 24%, #0a2621 0%, #051512 43%, #030e0d 80%);
 }
 
-.ambient-blob {
+/* Vignette: fades the scene out toward the edges and the bottom so it reads
+   as a glow behind the content rather than a flat, edge-to-edge poster. */
+.green-waves::after {
+    content: '';
     position: absolute;
-    border-radius: 9999px;
-    filter: blur(clamp(80px, 7vw, 160px));
+    inset: 0;
+    background: radial-gradient(ellipse at 55% 42%, transparent 28%, #01090888 100%),
+                linear-gradient(0deg, #030e0d 0%, #030e0d00 35%);
+}
+
+/* Oversized (inset: -8%, not 0) so the parallax offset below never reveals a
+   hard edge; carries only the cursor-parallax transform, kept separate from
+   .aurora-art's own drift animation since one element can't animate
+   `transform` from two independent sources at once. */
+.aurora-parallax {
+    position: absolute;
+    inset: -8%;
+    transform: translate3d(calc(var(--px, 0) * var(--depth, 1) * 1%), calc(var(--py, 0) * var(--depth, 1) * 1%), 0);
+}
+
+.aurora-art {
+    position: absolute;
+    inset: 0;
     will-change: transform;
+    animation: aurora-drift 32s ease-in-out infinite alternate;
 }
 
-.ambient-blob-1 {
-    width: 55vmax;
-    height: 55vmax;
-    top: -20vmax;
-    left: -18vmax;
-    background: radial-gradient(circle at 30% 30%, rgba(34, 197, 94, 0.55), transparent 70%);
-    animation: ambient-drift-1 28s ease-in-out infinite alternate;
+.aurora-art svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
-.ambient-blob-2 {
-    width: 46vmax;
-    height: 46vmax;
-    bottom: -18vmax;
-    right: -14vmax;
-    background: radial-gradient(circle at 60% 40%, rgba(56, 189, 248, 0.4), transparent 70%);
-    animation: ambient-drift-2 34s ease-in-out infinite alternate;
-}
-
-.ambient-blob-3 {
-    width: 36vmax;
-    height: 36vmax;
-    top: 26%;
-    left: 40%;
-    background: radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.3), transparent 70%);
-    animation: ambient-drift-3 40s ease-in-out infinite alternate;
-}
-
-@keyframes ambient-drift-1 {
-    from { transform: translate(0, 0) scale(1); }
-    to   { transform: translate(4rem, 3rem) scale(1.08); }
-}
-
-@keyframes ambient-drift-2 {
-    from { transform: translate(0, 0) scale(1); }
-    to   { transform: translate(-3rem, -4rem) scale(1.1); }
-}
-
-@keyframes ambient-drift-3 {
-    from { transform: translate(0, 0) scale(1); }
-    to   { transform: translate(-2rem, 3rem) scale(0.95); }
+@keyframes aurora-drift {
+    from { transform: translate3d(-.7%, .6%, 0); }
+    to   { transform: translate3d(.7%, -.6%, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ambient-blob {
+    .aurora-art {
+        animation: none;
+    }
+
+    .aurora-parallax {
+        transform: none;
+    }
+}
+
+/* Faint animated film-grain layer over the whole page: breaks up the flat
+   dark background and the blobs' gradient banding a little, the way a lot
+   of dark, glow-heavy UIs (Linear, Vercel, etc.) do it. Static SVG noise
+   tile, so it's one paint plus a cheap opacity flicker, no JS. */
+.ambient-grain {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    animation: ambient-grain-flicker 1.4s steps(3) infinite;
+}
+
+@keyframes ambient-grain-flicker {
+    0%, 100% { opacity: 0.05; }
+    50%      { opacity: 0.03; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ambient-grain {
         animation: none;
     }
 }

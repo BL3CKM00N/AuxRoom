@@ -17,11 +17,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans text-aux-text antialiased bg-aux-bg">
-        <div class="ambient-glow" aria-hidden="true">
-            <div class="ambient-blob ambient-blob-1"></div>
-            <div class="ambient-blob ambient-blob-2"></div>
-            <div class="ambient-blob ambient-blob-3"></div>
-        </div>
+        <x-ambient-background />
 
         <div class="relative z-10 min-h-screen flex flex-col justify-center items-center px-6 py-10">
             <div>
