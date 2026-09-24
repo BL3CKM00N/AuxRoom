@@ -103,11 +103,12 @@ input[type='range']::-moz-range-thumb {
 }
 
 /* Aurora background (the <x-ambient-background /> component): a hand-built
-   SVG "curtain of light" scene, drifting slowly on its own loop. A bit of JS
-   (resources/js/alpine/ambient-background.js) layers a subtle cursor-parallax
-   on top by writing --px/--py onto .green-waves, eased toward the pointer
-   instead of following it 1:1. `position: fixed` so it always fills the
-   viewport regardless of page height. */
+   SVG "curtain of light" scene. The ribbons morph on their own loop via
+   native SVG <animate> on each path's `d` (see the component), not CSS. A
+   bit of JS (resources/js/alpine/ambient-background.js) layers a subtle
+   cursor-parallax on top by writing --px/--py onto .green-waves, eased
+   toward the pointer instead of following it 1:1. `position: fixed` so it
+   always fills the viewport regardless of page height. */
 .green-waves {
     position: fixed;
     inset: 0;
@@ -128,9 +129,9 @@ input[type='range']::-moz-range-thumb {
 }
 
 /* Oversized (inset: -8%, not 0) so the parallax offset below never reveals a
-   hard edge; carries only the cursor-parallax transform, kept separate from
-   .aurora-art's own drift animation since one element can't animate
-   `transform` from two independent sources at once. */
+   hard edge. Carries only the cursor-parallax transform; the ribbons' own
+   motion lives inside the SVG itself now (SMIL `<animate>` on each path),
+   not on this element. */
 .aurora-parallax {
     position: absolute;
     inset: -8%;
@@ -140,8 +141,6 @@ input[type='range']::-moz-range-thumb {
 .aurora-art {
     position: absolute;
     inset: 0;
-    will-change: transform;
-    animation: aurora-drift 32s ease-in-out infinite alternate;
 }
 
 .aurora-art svg {
@@ -150,16 +149,7 @@ input[type='range']::-moz-range-thumb {
     height: 100%;
 }
 
-@keyframes aurora-drift {
-    from { transform: translate3d(-.7%, .6%, 0); }
-    to   { transform: translate3d(.7%, -.6%, 0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-    .aurora-art {
-        animation: none;
-    }
-
     .aurora-parallax {
         transform: none;
     }
