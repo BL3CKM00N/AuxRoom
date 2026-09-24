@@ -16,6 +16,8 @@
         @livewireStyles
     </head>
     <body class="antialiased font-sans bg-aux-bg text-aux-text">
+        <x-offline-overlay />
+
         <div class="relative min-h-screen flex flex-col overflow-hidden">
             <x-ambient-background />
 

@@ -18,6 +18,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans text-aux-text antialiased bg-aux-bg">
+        <x-offline-overlay />
         <x-ambient-background />
 
         <div class="relative z-10 min-h-screen flex flex-col justify-center items-center px-6 py-10">

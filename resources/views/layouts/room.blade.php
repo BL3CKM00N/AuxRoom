@@ -17,6 +17,8 @@
         @livewireStyles
     </head>
     <body class="font-sans antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+        <x-offline-overlay />
+
         {{-- Mirrors layouts.app's wrapper: the page's own root is flex-1 (not
              min-h-screen), and relies on this flex-col parent to stretch it,
              so nav's fixed height only gets compensated once. padTop is only

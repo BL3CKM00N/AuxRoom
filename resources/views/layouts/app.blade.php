@@ -18,6 +18,8 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased bg-aux-bg text-aux-text">
+        <x-offline-overlay />
+
         {{-- flex flex-col (not just min-h-screen) so <main> can be flex-1 and
              stretch to fill the remaining height: the room dashboard's own
              root relies on that instead of redeclaring min-h-screen itself,
