@@ -9,6 +9,11 @@
 
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
         <x-pwa-meta />
+        {{-- $ogTitle/$ogDescription only exist when this layout is reached via
+             <x-guest-layout> (see App\View\Components\GuestLayout). Livewire
+             Volt pages reach it directly via #[Layout('layouts.guest')]
+             instead, which never defines them. --}}
+        <x-social-meta :title="$ogTitle ?? null" :description="$ogDescription ?? null" />
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

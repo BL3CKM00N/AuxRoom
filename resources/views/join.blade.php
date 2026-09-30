@@ -1,4 +1,6 @@
-<x-guest-layout>
+<x-guest-layout
+    og-title="Join a room on AuxRoom"
+    og-description="You've been invited to a shared listening session. No Spotify account needed to join.">
     <div class="mb-4 text-sm text-aux-muted">
         Enter your name and the room's invite code to join.
     </div>
