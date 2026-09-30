@@ -21,7 +21,12 @@
         <div class="relative min-h-screen flex flex-col overflow-hidden">
             <x-ambient-background />
 
-            <header class="relative z-10 max-w-5xl mx-auto w-full px-6 py-8 flex items-center justify-between">
+            {{-- Fixed (out of flow) on mobile so the hero card below centers
+                 against the full viewport height instead of the space left
+                 over after the header, the header's few pixels don't need to
+                 be accounted for. Back to a normal flow item at lg, where the
+                 hero has room to breathe either way. --}}
+            <header class="fixed top-0 inset-x-0 z-20 lg:relative lg:z-10 max-w-5xl mx-auto w-full px-6 py-8 flex items-center justify-between">
                 <a href="/" class="flex items-center">
                     <x-logo class="h-6" />
                 </a>
