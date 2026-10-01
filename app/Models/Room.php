@@ -34,6 +34,7 @@ class Room extends Model
         'now_playing_position_ms',
         'last_local_command_at',
         'is_playing',
+        'playback_inactive_at',
         'shuffle_enabled',
         'repeat_mode',
         'volume_percent',
@@ -53,7 +54,20 @@ class Room extends Model
             'now_playing_started_at' => 'datetime',
             'last_local_command_at' => 'datetime',
             'is_playing' => 'boolean',
+            'playback_inactive_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Anything that starts playback (a local command, or the sync seeing a
+        // live state) also ends "inactive", without every writer having to
+        // remember to clear it.
+        static::saving(function (Room $room) {
+            if ($room->is_playing && $room->playback_inactive_at !== null) {
+                $room->playback_inactive_at = null;
+            }
+        });
     }
 
     public function getRouteKeyName(): string
@@ -138,7 +152,10 @@ class Room extends Model
      */
     public function nowPlayingDetails(): ?object
     {
-        if (! $this->now_playing_track_id) {
+        // Hidden while playback is inactive, even though the track is still
+        // stored for resuming: showing it as "paused" when there's nothing
+        // left to play on is what left a dead track on screen.
+        if (! $this->now_playing_track_id || $this->playbackInactive()) {
             return null;
         }
 
@@ -148,6 +165,21 @@ class Room extends Model
             'album_art_url' => $this->now_playing_album_art_url,
             'duration_ms' => $this->now_playing_duration_ms,
         ];
+    }
+
+    /**
+     * Spotify reported no active device and nothing has played since. The
+     * stored track and position are deliberately left in place for resuming.
+     */
+    public function playbackInactive(): bool
+    {
+        return $this->playback_inactive_at !== null && ! $this->is_playing;
+    }
+
+    /** The fallback playlist counts as "playing" for display only while playback is live. */
+    public function fallbackIsShown(): bool
+    {
+        return $this->is_playing_fallback && ! $this->playbackInactive();
     }
 
     /**

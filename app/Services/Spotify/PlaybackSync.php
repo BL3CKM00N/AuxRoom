@@ -45,7 +45,7 @@ class PlaybackSync
         }
 
         if (! $state) {
-            $this->handleNothingActive($room, $client);
+            $this->markInactive($room);
 
             return;
         }
@@ -87,8 +87,9 @@ class PlaybackSync
         $fallbackFlagChanged = $isFallbackContext !== $room->is_playing_fallback;
         $shuffleChanged = $state['shuffle_enabled'] !== $room->shuffle_enabled;
         $repeatChanged = $state['repeat_mode'] !== $room->repeat_mode;
+        $wasInactive = $room->playback_inactive_at !== null;
 
-        if (! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
+        if (! $wasInactive && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
             return;
         }
 
@@ -105,46 +106,34 @@ class PlaybackSync
             'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
             'shuffle_enabled' => $state['shuffle_enabled'],
             'repeat_mode' => $state['repeat_mode'],
+            'playback_inactive_at' => null,
         ]);
 
         RoomUpdated::broadcastFor($room, 'playback');
     }
 
     /**
-     * Spotify returned 204: no *active* device. That also happens when a
-     * paused device has simply idled out, in which case the device is still
-     * listed and the stored track and position must survive, since resuming
-     * re-issues that exact track at that exact position. Only when no device
-     * is visible at all (the app was closed, the speaker went away) is the
-     * now-playing state cleared, so the dashboard says "no device" instead
-     * of showing a dead track forever.
+     * Spotify returned 204: no *active* device anywhere. That's the signal,
+     * deliberately not second-guessed against the device list: Spotify keeps
+     * listing a device for a while after it has really gone, which is how a
+     * dead track used to stay on screen as "paused". The room is marked
+     * inactive instead, which hides that track everywhere (see
+     * Room::nowPlayingDetails()) while leaving the track and position stored,
+     * so Play can still resume it exactly once a device is back.
      */
-    private function handleNothingActive(Room $room, SpotifyClientContract $client): void
+    private function markInactive(Room $room): void
     {
-        if (! $room->is_playing && ! $room->now_playing_track_id) {
-            return;
-        }
+        $hasSomethingToHide = $room->is_playing || $room->now_playing_track_id || $room->is_playing_fallback;
 
-        if ($client->getDevices() !== []) {
-            if ($room->is_playing) {
-                $room->update(['is_playing' => false]);
-                RoomUpdated::broadcastFor($room, 'playback');
-            }
-
+        if ($room->playback_inactive_at !== null || ! $hasSomethingToHide) {
             return;
         }
 
         $room->update([
             'is_playing' => false,
-            'now_playing_queue_item_id' => null,
-            'now_playing_track_id' => null,
-            'now_playing_name' => null,
-            'now_playing_artist' => null,
-            'now_playing_album_art_url' => null,
-            'now_playing_duration_ms' => null,
-            'now_playing_started_at' => null,
-            'now_playing_position_ms' => 0,
+            'playback_inactive_at' => now(),
         ]);
+
         RoomUpdated::broadcastFor($room, 'playback');
     }
 }

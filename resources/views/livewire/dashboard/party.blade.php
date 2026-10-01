@@ -80,7 +80,8 @@
         // waiting-for-a-track state, which otherwise reads as if the room
         // just hasn't started yet rather than needing the host's attention.
         $spotifyDisconnected = $this->spotifyNeedsReconnect;
-        $noDeviceAvailable = ! $spotifyDisconnected && ! $this->isMock && ! $this->nowPlaying && empty($this->devices);
+        $noDeviceAvailable = ! $spotifyDisconnected && ! $this->isMock
+            && ($room->playbackInactive() || (! $this->nowPlaying && empty($this->devices)));
     @endphp
     <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
         <div class="w-72 h-72 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] max-w-full aspect-square rounded-2xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border flex items-center justify-center overflow-hidden shadow-2xl shadow-aux-accent/10">
