@@ -30,6 +30,9 @@
             <x-input-label for="invite_code" value="Invite code" />
             <x-text-input id="invite_code" name="invite_code" type="text" class="mt-1 block w-full"
                 placeholder="XXXXXX-XXXXXX-XXXXXX" required value="{{ old('invite_code', $code) }}" />
+            <div class="mt-2">
+                <x-qr-scan-button target="invite_code" next="name" />
+            </div>
         </div>
 
         <x-primary-button type="submit" class="w-full justify-center">Join room</x-primary-button>

@@ -21,6 +21,7 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @livewireStyles
     </head>
     <body class="font-sans text-aux-text antialiased bg-aux-bg">
         <x-offline-overlay />
@@ -37,5 +38,12 @@
                 {{ $slot }}
             </div>
         </div>
+
+        {{-- Explicit (not left to Livewire's auto-inject): plain pages like /join
+             render no Livewire component, so without this Alpine never loaded
+             there, and everything x-data on the page (offline overlay, QR
+             scanner) was silently inert. Safe alongside the auto-inject the
+             Volt auth pages get, which skips itself when these are present. --}}
+        @livewireScripts
     </body>
 </html>
