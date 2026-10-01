@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 class Room extends Model
 {
@@ -62,9 +61,25 @@ class Room extends Model
         return 'invite_code';
     }
 
+    /**
+     * Codes get read aloud, screenshotted and typed on phones, so the
+     * look-alikes (0/O, 1/I/L) are left out. 31 symbols over 18 positions is
+     * still ~4e26 combinations. Codes issued before this change may contain
+     * those characters and keep working: lookups are exact matches.
+     */
+    private const INVITE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
     public static function generateInviteCode(): string
     {
-        $segment = fn () => strtoupper(Str::random(6));
+        $segment = function (): string {
+            $segment = '';
+
+            for ($i = 0; $i < 6; $i++) {
+                $segment .= self::INVITE_ALPHABET[random_int(0, strlen(self::INVITE_ALPHABET) - 1)];
+            }
+
+            return $segment;
+        };
 
         return sprintf('%s-%s-%s', $segment(), $segment(), $segment());
     }
