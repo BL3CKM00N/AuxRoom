@@ -217,6 +217,9 @@ trait HandlesPlayback
             return;
         }
 
+        $duration = (int) $this->room->now_playing_duration_ms;
+        $ms = max(0, $duration > 0 ? min($ms, $duration) : $ms);
+
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms, $this->providerDeviceId())) {
             $this->controlError = "Spotify couldn't seek playback.";
 
@@ -253,6 +256,13 @@ trait HandlesPlayback
     public function switchProvider(int $userId): void
     {
         if (! $this->isHost) {
+            return;
+        }
+
+        // Only someone actually in this room with Spotify connected, the same
+        // list the picker offers. An arbitrary id would point this room's
+        // playback commands and state reads at another user's Spotify account.
+        if (! $this->eligibleProviders->contains('user_id', $userId)) {
             return;
         }
 

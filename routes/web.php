@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'welcome');
 
 Route::get('/join', [JoinController::class, 'create'])->name('join');
-Route::post('/join', [JoinController::class, 'store'])->name('join.store');
+// Throttled because every successful submit creates a guest member row.
+Route::post('/join', [JoinController::class, 'store'])->middleware('throttle:10,1')->name('join.store');
 
 // Your room, if you're hosting one — otherwise mount() bounces to rooms.create.
 Route::get('/dashboard', ShowRoom::class)

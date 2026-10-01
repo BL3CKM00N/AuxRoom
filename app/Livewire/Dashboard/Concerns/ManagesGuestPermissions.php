@@ -58,6 +58,14 @@ trait ManagesGuestPermissions
             return false;
         }
 
+        if ($this->spotifyNeedsReconnect) {
+            $this->controlError = $this->isHost
+                ? 'Your Spotify connection expired. Reconnect it in Room Settings.'
+                : 'Spotify needs to be reconnected by the host.';
+
+            return false;
+        }
+
         if (! $this->isHost && $ability === 'guests_can_add_to_queue' && ! $this->room->guests_can_add_to_queue) {
             $this->controlError = 'The host has locked the queue for everyone.';
 

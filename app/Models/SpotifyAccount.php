@@ -14,6 +14,7 @@ class SpotifyAccount extends Model
         'access_token',
         'refresh_token',
         'token_expires_at',
+        'needs_reconnect_at',
         'scopes',
         'spotify_user_id',
         'display_name',
@@ -29,12 +30,19 @@ class SpotifyAccount extends Model
             'access_token' => 'encrypted',
             'refresh_token' => 'encrypted',
             'token_expires_at' => 'datetime',
+            'needs_reconnect_at' => 'datetime',
         ];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** Spotify permanently rejected these credentials; only the owner reconnecting fixes it. */
+    public function needsReconnect(): bool
+    {
+        return $this->needs_reconnect_at !== null;
     }
 
     public function isTokenExpired(): bool

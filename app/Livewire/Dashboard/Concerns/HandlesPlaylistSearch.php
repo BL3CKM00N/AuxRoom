@@ -3,20 +3,30 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Services\Spotify\SpotifyClientFactory;
+use Livewire\Attributes\Locked;
 
 /** Track search + add-to-queue, and the playlist picker popup (search, browse, pick-and-play). */
 trait HandlesPlaylistSearch
 {
     public string $search = '';
 
-    /** @var array<int, array> */
+    /**
+     * Locked: these are only ever set server-side by search(), but
+     * addToQueue()/playPlaylist() act on an entry by index, so a
+     * client-writable copy would let anyone queue or play arbitrary track
+     * and playlist data (URIs, names, image URLs shown to every guest).
+     *
+     * @var array<int, array>
+     */
+    #[Locked]
     public array $searchResults = [];
 
     public bool $showPlaylistPicker = false;
 
     public string $playlistQuery = '';
 
-    /** @var array<int, array> */
+    /** @var array<int, array> Locked for the same reason as $searchResults. */
+    #[Locked]
     public array $playlistResults = [];
 
     public function updatedSearch(): void
@@ -32,13 +42,17 @@ trait HandlesPlaylistSearch
     {
         $this->controlError = '';
 
-        if (trim($this->search) === '') {
+        $query = mb_substr(trim($this->search), 0, 100);
+
+        // Every call spends the host's Spotify API quota, so a visitor who
+        // hasn't been let in yet (private room) doesn't get to trigger one.
+        if ($query === '' || ! $this->isApproved) {
             $this->searchResults = [];
 
             return;
         }
 
-        $this->searchResults = app(SpotifyClientFactory::class)->forRoom($this->room)->search($this->search, 8);
+        $this->searchResults = app(SpotifyClientFactory::class)->forRoom($this->room)->search($query, 8);
     }
 
     public function addToQueue(int $index): void

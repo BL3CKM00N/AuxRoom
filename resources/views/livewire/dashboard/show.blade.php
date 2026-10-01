@@ -33,6 +33,17 @@
             </div>
         @endif
 
+        @if ($this->spotifyNeedsReconnect)
+            <div class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between gap-3 text-xs">
+                <span class="text-aux-muted"><span class="text-red-400 font-medium">Spotify disconnected</span> &middot; music may still be playing, but AuxRoom can't see or control it.</span>
+                @if ($this->isHost)
+                    <button wire:click="setTab('hub')" class="text-aux-accent font-medium shrink-0 flex items-center gap-1">Reconnect <x-icon name="chevron-right" class="w-3 h-3" /></button>
+                @else
+                    <span class="text-aux-faint shrink-0">The host needs to reconnect</span>
+                @endif
+            </div>
+        @endif
+
         @if (session('status'))
             <div class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-lg bg-aux-accent-soft border border-aux-accent/20 text-aux-accent text-xs">
                 {{ session('status') }}

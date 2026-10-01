@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Volt\Volt;
@@ -57,6 +58,13 @@ class AuthenticationTest extends TestCase
     public function test_navigation_menu_can_be_rendered(): void
     {
         $user = User::factory()->create();
+
+        // /dashboard is the host's room; without one it sends you to create it.
+        $room = Room::create([
+            'invite_code' => 'AAAAAA-BBBBBB-CCCCCC',
+            'host_id' => $user->id,
+            'playback_provider_id' => $user->id,
+        ]);
 
         $this->actingAs($user);
 

@@ -2,14 +2,19 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\Room;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\SpotifyClientFactory;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PartyScreen extends Component
 {
+    use ResolvesSpotifyDevices;
+
+    #[Locked]
     public Room $room;
 
     public function mount(Room $room): void

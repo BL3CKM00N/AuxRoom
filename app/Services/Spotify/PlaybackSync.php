@@ -34,15 +34,18 @@ class PlaybackSync
             return;
         }
 
-        $state = $this->clients->forRoom($room)->getPlaybackState();
+        $client = $this->clients->forRoom($room);
+
+        try {
+            $state = $client->getPlaybackState();
+        } catch (SpotifyRequestFailed) {
+            // An outage or rate limit says nothing about what's playing, so
+            // leave the room's last known state alone rather than clearing it.
+            return;
+        }
 
         if (! $state) {
-            // Nothing playing anywhere on the account at all (not even
-            // paused) — reflect that if the room still thought otherwise.
-            if ($room->is_playing) {
-                $room->update(['is_playing' => false]);
-                RoomUpdated::broadcastFor($room, 'playback');
-            }
+            $this->handleNothingActive($room, $client);
 
             return;
         }
@@ -104,6 +107,44 @@ class PlaybackSync
             'repeat_mode' => $state['repeat_mode'],
         ]);
 
+        RoomUpdated::broadcastFor($room, 'playback');
+    }
+
+    /**
+     * Spotify returned 204: no *active* device. That also happens when a
+     * paused device has simply idled out, in which case the device is still
+     * listed and the stored track and position must survive, since resuming
+     * re-issues that exact track at that exact position. Only when no device
+     * is visible at all (the app was closed, the speaker went away) is the
+     * now-playing state cleared, so the dashboard says "no device" instead
+     * of showing a dead track forever.
+     */
+    private function handleNothingActive(Room $room, SpotifyClientContract $client): void
+    {
+        if (! $room->is_playing && ! $room->now_playing_track_id) {
+            return;
+        }
+
+        if ($client->getDevices() !== []) {
+            if ($room->is_playing) {
+                $room->update(['is_playing' => false]);
+                RoomUpdated::broadcastFor($room, 'playback');
+            }
+
+            return;
+        }
+
+        $room->update([
+            'is_playing' => false,
+            'now_playing_queue_item_id' => null,
+            'now_playing_track_id' => null,
+            'now_playing_name' => null,
+            'now_playing_artist' => null,
+            'now_playing_album_art_url' => null,
+            'now_playing_duration_ms' => null,
+            'now_playing_started_at' => null,
+            'now_playing_position_ms' => 0,
+        ]);
         RoomUpdated::broadcastFor($room, 'playback');
     }
 }

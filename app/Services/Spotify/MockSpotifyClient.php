@@ -17,7 +17,7 @@ class MockSpotifyClient implements SpotifyClientContract
         return [];
     }
 
-    public function getDevices(): array
+    public function getDevices(bool $allowCached = false): array
     {
         return [
             ['id' => 'demo-living-room', 'name' => 'Living room speaker (demo)', 'type' => 'Speaker', 'is_active' => true],

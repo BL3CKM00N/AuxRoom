@@ -25,10 +25,16 @@ trait HandlesLocationEnforcement
             return;
         }
 
+        // Same bounds the room-creation form enforces; this path used to
+        // accept anything, so a bad value could save an unusable boundary.
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+            return;
+        }
+
         $this->room->update([
             'location_lat' => $lat,
             'location_lng' => $lng,
-            'location_radius_m' => $radius,
+            'location_radius_m' => max(10, min(5000, $radius)),
         ]);
 
         $this->logActivity('settings', 'Room location boundary updated.');

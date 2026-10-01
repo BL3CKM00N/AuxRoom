@@ -79,6 +79,7 @@ class SpotifyConnectionController extends Controller
             'refresh_token' => $data['refresh_token'],
             'token_expires_at' => now()->addSeconds($data['expires_in']),
             'scopes' => $data['scope'],
+            'needs_reconnect_at' => null,
         ]);
 
         $profile = Http::withToken($account->access_token)->get('https://api.spotify.com/v1/me');

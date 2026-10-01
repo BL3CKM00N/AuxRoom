@@ -228,13 +228,23 @@
                 <x-icon name="shield" class="w-4 h-4" />
             </span>
             <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $room->playbackProvider?->hasSpotifyConnected() ? 'bg-aux-accent-soft text-aux-accent' : 'bg-white/5 text-aux-faint' }}">
-                {{ $room->playbackProvider?->hasSpotifyConnected() ? 'CONNECTED' : 'NOT CONNECTED' }}
+                {{ $this->spotifyNeedsReconnect ? 'EXPIRED' : ($room->playbackProvider?->hasSpotifyConnected() ? 'CONNECTED' : 'NOT CONNECTED') }}
             </span>
         </div>
         <p class="mt-3 font-medium text-sm">Spotify connection</p>
         <p class="text-xs text-aux-faint mt-1">Credentials stay on the server</p>
 
-        @if ($room->playbackProvider?->hasSpotifyConnected())
+        @if ($this->spotifyNeedsReconnect)
+            <p class="text-sm mt-2 text-red-400">Spotify rejected the saved connection. Access was revoked or the app's client secret changed.</p>
+            @if (auth()->id() === $room->playbackProvider?->id)
+                <p class="text-xs text-aux-faint mt-1">Enter your app's credentials again to reconnect.</p>
+                <div class="mt-3">
+                    <x-spotify-connect-form :account="auth()->user()->spotifyAccount" />
+                </div>
+            @else
+                <p class="text-xs text-aux-faint mt-1">{{ $room->playbackProvider?->name }} needs to reconnect their Spotify.</p>
+            @endif
+        @elseif ($room->playbackProvider?->hasSpotifyConnected())
             <p class="text-sm mt-2">Connected as {{ $room->playbackProvider->spotifyAccount->display_name ?? $room->playbackProvider->name }}</p>
             <form method="POST" action="{{ route('spotify.disconnect') }}" class="mt-3">
                 @csrf

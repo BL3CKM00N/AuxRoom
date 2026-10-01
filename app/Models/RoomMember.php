@@ -84,7 +84,7 @@ class RoomMember extends Model
 
     public function isOnline(): bool
     {
-        return $this->left_at === null && $this->last_seen_at?->gt(now()->subMinutes(2));
+        return $this->left_at === null && ($this->last_seen_at?->gt(now()->subMinutes(2)) ?? false);
     }
 
     public function passesLocationCheck(): bool

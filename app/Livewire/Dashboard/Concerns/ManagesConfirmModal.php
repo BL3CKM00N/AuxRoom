@@ -9,6 +9,21 @@ namespace App\Livewire\Dashboard\Concerns;
  */
 trait ManagesConfirmModal
 {
+    /**
+     * confirmYes() dispatches by name, and both the action and its params
+     * are client-settable, so without an allowlist a visitor could stage any
+     * method on the component, including private helpers that skip the
+     * permission checks their public wrappers do (e.g. playTrackAt).
+     */
+    private const CONFIRMABLE_ACTIONS = [
+        'closeRoom',
+        'denyMember',
+        'kickMember',
+        'revokeAllAccess',
+        'toggleLocationEnforced',
+        'togglePrivate',
+    ];
+
     public ?string $confirmAction = null;
 
     /** @var array<int, mixed> */
@@ -42,7 +57,7 @@ trait ManagesConfirmModal
         $this->confirmParams = [];
         $this->confirmMessage = '';
 
-        if ($action && method_exists($this, $action)) {
+        if ($action && in_array($action, self::CONFIRMABLE_ACTIONS, true)) {
             return $this->{$action}(...$params);
         }
 

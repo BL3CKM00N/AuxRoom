@@ -74,6 +74,14 @@
         </span>
     </div>
 
+    @php
+        // Same signal as the Now Playing tab (see queue.blade.php): tells
+        // "no Spotify client open anywhere" apart from the generic
+        // waiting-for-a-track state, which otherwise reads as if the room
+        // just hasn't started yet rather than needing the host's attention.
+        $spotifyDisconnected = $this->spotifyNeedsReconnect;
+        $noDeviceAvailable = ! $spotifyDisconnected && ! $this->isMock && ! $this->nowPlaying && empty($this->devices);
+    @endphp
     <div class="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-8 py-16">
         <div class="w-72 h-72 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] max-w-full aspect-square rounded-2xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border flex items-center justify-center overflow-hidden shadow-2xl shadow-aux-accent/10">
             @if ($this->nowPlaying?->album_art_url)
@@ -84,12 +92,12 @@
         </div>
 
         <p class="mt-8 text-xs lg:text-sm font-semibold uppercase tracking-widest text-aux-accent">
-            {{ $this->nowPlaying ? 'Currently spinning' : 'Waiting for the first track' }}
+            {{ $spotifyDisconnected ? 'Spotify disconnected' : ($this->nowPlaying ? 'Currently spinning' : ($noDeviceAvailable ? 'No device found' : 'Waiting for the first track')) }}
         </p>
-        <h1 class="mt-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold max-w-3xl lg:max-w-5xl">{{ $this->nowPlaying->name ?? 'AuxRoom' }}</h1>
-        <p class="mt-3 text-xl lg:text-2xl xl:text-3xl text-aux-muted">{{ $this->nowPlaying->artist ?? 'Scan the code to join and add a song' }}</p>
+        <h1 class="mt-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold max-w-3xl lg:max-w-5xl">{{ $this->nowPlaying->name ?? ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($noDeviceAvailable ? "Nothing's playing anywhere" : 'AuxRoom')) }}</h1>
+        <p class="mt-3 text-xl lg:text-2xl xl:text-3xl text-aux-muted">{{ $this->nowPlaying->artist ?? ($spotifyDisconnected ? 'Ask the host to reconnect Spotify' : ($noDeviceAvailable ? 'Ask the host to open Spotify on a device' : 'Scan the code to join and add a song')) }}</p>
 
-        @if ($this->nowPlaying)
+        @if ($this->nowPlaying && ! $spotifyDisconnected)
             <span class="mt-4 inline-flex px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full bg-white/5 text-[11px] lg:text-sm font-semibold text-aux-muted">
                 {{ $room->is_playing ? 'PLAYING' : 'PAUSED' }}
             </span>

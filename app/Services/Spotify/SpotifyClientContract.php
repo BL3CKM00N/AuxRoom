@@ -10,9 +10,13 @@ interface SpotifyClientContract
     public function search(string $query, int $limit = 10): array;
 
     /**
+     * $allowCached lets display-only callers reuse a recent result; anything
+     * that acts on the answer (picking a device to send a command to) must
+     * leave it false and get a live read.
+     *
      * @return array<int, array{id: string, name: string, type: string, is_active: bool}>
      */
-    public function getDevices(): array;
+    public function getDevices(bool $allowCached = false): array;
 
     public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool;
 
@@ -88,7 +92,13 @@ interface SpotifyClientContract
      * device, etc). Includes full track metadata so the room can display
      * exactly what's playing even if it wasn't added through AuxRoom.
      *
+     * Null means Spotify itself reported nothing active (HTTP 204). A failed
+     * request throws SpotifyRequestFailed instead, so an outage or rate limit
+     * is never mistaken for "no device".
+     *
      * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int, context_uri: ?string, shuffle_enabled: bool, repeat_mode: string}|null
+     *
+     * @throws SpotifyRequestFailed
      */
     public function getPlaybackState(): ?array;
 }

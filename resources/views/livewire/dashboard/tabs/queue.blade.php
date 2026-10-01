@@ -8,7 +8,8 @@
             // open anywhere" from the generic empty-queue state: $this->devices
             // reflects what Spotify Connect currently reports, same signal
             // the device picker in Room Settings uses to hide itself.
-            $noDeviceAvailable = ! $this->isMock && ! $this->nowPlaying && ! $room->is_playing_fallback && empty($this->devices);
+            $spotifyDisconnected = $this->spotifyNeedsReconnect;
+            $noDeviceAvailable = ! $spotifyDisconnected && ! $this->isMock && ! $this->nowPlaying && ! $room->is_playing_fallback && empty($this->devices);
         @endphp
         <div class="p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border">
             <div class="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
@@ -21,10 +22,10 @@
                 </div>
                 <div class="w-full min-w-0 sm:flex-1">
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-aux-accent">
-                        <x-icon name="note" class="w-3.5 h-3.5" /> {{ $noDeviceAvailable ? 'No device found' : ($room->is_playing ? 'Now spinning' : 'On pause') }}
+                        <x-icon name="note" class="w-3.5 h-3.5" /> {{ $spotifyDisconnected ? 'Spotify disconnected' : ($noDeviceAvailable ? 'No device found' : ($room->is_playing ? 'Now spinning' : 'On pause')) }}
                     </span>
-                    <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($room->is_playing_fallback ? $room->fallback_playlist_name : ($noDeviceAvailable ? 'Nothing\'s playing anywhere' : 'Nothing queued yet')) }}</h2>
-                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Playlist · shuffled' : ($noDeviceAvailable ? 'Open Spotify on a phone, computer, or speaker, then come back here.' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track'))) }}</p>
+                    <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($room->is_playing_fallback ? $room->fallback_playlist_name : ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($noDeviceAvailable ? 'Nothing\'s playing anywhere' : 'Nothing queued yet'))) }}</h2>
+                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($room->is_playing_fallback ? 'Playlist · shuffled' : ($spotifyDisconnected ? ($this->isHost ? 'Reconnect it in Room Settings.' : 'The host needs to reconnect Spotify.') : ($noDeviceAvailable ? 'Open Spotify on a phone, computer, or speaker, then come back here.' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track')))) }}</p>
 
                     @if ($this->nowPlaying || $room->is_playing_fallback)
                         <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint"

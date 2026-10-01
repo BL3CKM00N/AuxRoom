@@ -9,11 +9,13 @@ use App\Livewire\Dashboard\Concerns\HandlesPlayback;
 use App\Livewire\Dashboard\Concerns\HandlesPlaylistSearch;
 use App\Livewire\Dashboard\Concerns\ManagesConfirmModal;
 use App\Livewire\Dashboard\Concerns\ManagesGuestPermissions;
+use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\ActivityEvent;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
 use App\Services\Spotify\SpotifyClientFactory;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -25,9 +27,14 @@ class ShowRoom extends Component
     use HandlesPlaylistSearch;
     use ManagesConfirmModal;
     use ManagesGuestPermissions;
+    use ResolvesSpotifyDevices;
 
+    #[Locked]
     public Room $room;
 
+    // Locked: isHost is derived from this member, so a client-settable id
+    // would let any guest set it to the host's and inherit every host action.
+    #[Locked]
     public int $memberId;
 
     public string $controlError = '';
@@ -230,32 +237,14 @@ class ShowRoom extends Component
         return $this->room->currentPositionMs();
     }
 
-    public function getIsMockProperty(): bool
-    {
-        return app(SpotifyClientFactory::class)->isMock($this->room);
-    }
-
     public function getEligibleProvidersProperty()
     {
         return $this->room->members()
             ->whereNotNull('user_id')
-            ->whereHas('user.spotifyAccount', fn ($q) => $q->whereNotNull('access_token'))
+            ->whereHas('user.spotifyAccount', fn ($q) => $q->whereNotNull('access_token')->whereNull('needs_reconnect_at'))
             ->with('user.spotifyAccount')
             ->get()
             ->unique('user_id');
-    }
-
-    public function getDevicesProperty(): array
-    {
-        if ($this->isMock) {
-            return app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices();
-        }
-
-        if (! $this->room->playbackProvider?->hasSpotifyConnected()) {
-            return [];
-        }
-
-        return app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices();
     }
 
     public function leaveRoom()

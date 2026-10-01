@@ -3,24 +3,57 @@
 namespace App\Services\Spotify;
 
 use App\Models\SpotifyAccount;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class SpotifyWebApiClient implements SpotifyClientContract
 {
+    /**
+     * Short-lived read cache, shared per Spotify account (not per visitor).
+     * Every guest's poll re-renders the dashboard, and each render used to
+     * make its own blocking round trip to Spotify with the host's token, so
+     * API load and render latency grew with guest count. Only display-only
+     * reads are cached; playback state is deliberately not (the sync's drift
+     * check compares its progress against the clock, so a stale copy would
+     * make the bar jump back), and any write we make invalidates both.
+     */
+    private const QUEUE_TTL_SECONDS = 3;
+
+    private const DEVICES_TTL_SECONDS = 5;
+
+    // Reads sit inside a render a visitor is waiting on, so they give up
+    // sooner than commands, which are a deliberate action worth waiting for.
+    private const READ_TIMEOUT_SECONDS = 5;
+
+    private const COMMAND_TIMEOUT_SECONDS = 10;
+
     public function __construct(private SpotifyAccount $account) {}
+
+    private function cacheKey(string $name): string
+    {
+        return "spotify:{$this->account->id}:{$name}";
+    }
+
+    private function forgetCachedReads(): void
+    {
+        Cache::forget($this->cacheKey('queue'));
+        Cache::forget($this->cacheKey('devices'));
+    }
 
     public function search(string $query, int $limit = 10): array
     {
-        $response = $this->http()->get('https://api.spotify.com/v1/search', [
+        $response = $this->get('https://api.spotify.com/v1/search', [
             'q' => $query,
             'type' => 'track',
             'limit' => $limit,
         ]);
 
-        if ($response->failed()) {
-            Log::warning('Spotify search failed', ['status' => $response->status(), 'body' => $response->body()]);
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify search failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
             return [];
         }
@@ -37,22 +70,34 @@ class SpotifyWebApiClient implements SpotifyClientContract
         ])->all();
     }
 
-    public function getDevices(): array
+    public function getDevices(bool $allowCached = false): array
     {
-        $response = $this->http()->get('https://api.spotify.com/v1/me/player/devices');
+        $key = $this->cacheKey('devices');
 
-        if ($response->failed()) {
-            Log::warning('Spotify device listing failed', ['status' => $response->status(), 'body' => $response->body()]);
-
-            return [];
+        if ($allowCached && is_array($cached = Cache::get($key))) {
+            return $cached;
         }
 
-        return collect($response->json('devices', []))->map(fn (array $device) => [
-            'id' => $device['id'],
-            'name' => $device['name'],
-            'type' => $device['type'],
-            'is_active' => $device['is_active'],
-        ])->all();
+        $response = $this->get('https://api.spotify.com/v1/me/player/devices');
+
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify device listing failed', ['status' => $response?->status(), 'body' => $response?->body()]);
+
+            $devices = [];
+        } else {
+            $devices = collect($response->json('devices', []))->map(fn (array $device) => [
+                'id' => $device['id'],
+                'name' => $device['name'],
+                'type' => $device['type'],
+                'is_active' => $device['is_active'],
+            ])->all();
+        }
+
+        // Written even on a fresh read (and on failure, so an outage or rate
+        // limit isn't hammered once per render): later display reads reuse it.
+        Cache::put($key, $devices, self::DEVICES_TTL_SECONDS);
+
+        return $devices;
     }
 
     public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool
@@ -138,14 +183,14 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     public function searchPlaylists(string $query, int $limit = 8): array
     {
-        $response = $this->http()->get('https://api.spotify.com/v1/search', [
+        $response = $this->get('https://api.spotify.com/v1/search', [
             'q' => $query,
             'type' => 'playlist',
             'limit' => $limit,
         ]);
 
-        if ($response->failed()) {
-            Log::warning('Spotify playlist search failed', ['status' => $response->status(), 'body' => $response->body()]);
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify playlist search failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
             return [];
         }
@@ -155,12 +200,12 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     public function myPlaylists(int $limit = 50): array
     {
-        $response = $this->http()->get('https://api.spotify.com/v1/me/playlists', [
+        $response = $this->get('https://api.spotify.com/v1/me/playlists', [
             'limit' => $limit,
         ]);
 
-        if ($response->failed()) {
-            Log::warning('Spotify playlist listing failed', ['status' => $response->status(), 'body' => $response->body()]);
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify playlist listing failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
             return [];
         }
@@ -170,9 +215,9 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     public function getPlaylist(string $id): ?array
     {
-        $response = $this->http()->get("https://api.spotify.com/v1/playlists/{$id}");
+        $response = $this->get("https://api.spotify.com/v1/playlists/{$id}");
 
-        if ($response->failed()) {
+        if (! $response || $response->failed()) {
             return null;
         }
 
@@ -242,26 +287,35 @@ class SpotifyWebApiClient implements SpotifyClientContract
             $url .= '?'.http_build_query($query);
         }
 
-        $response = $this->http()->post($url);
+        $response = $this->send('post', $url);
+        $this->forgetCachedReads();
 
-        if ($response->failed()) {
-            Log::warning('Spotify playback command failed', ['url' => $url, 'status' => $response->status(), 'body' => $response->body()]);
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify playback command failed', ['url' => $url, 'status' => $response?->status(), 'body' => $response?->body()]);
         }
 
-        return $response->successful();
+        return (bool) $response?->successful();
     }
 
     public function getQueue(): array
     {
-        $response = $this->http()->get('https://api.spotify.com/v1/me/player/queue');
+        $key = $this->cacheKey('queue');
 
-        if ($response->failed()) {
-            Log::warning('Spotify queue fetch failed', ['status' => $response->status(), 'body' => $response->body()]);
+        if (is_array($cached = Cache::get($key))) {
+            return $cached;
+        }
+
+        $response = $this->get('https://api.spotify.com/v1/me/player/queue');
+
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify queue fetch failed', ['status' => $response?->status(), 'body' => $response?->body()]);
+
+            Cache::put($key, [], self::QUEUE_TTL_SECONDS);
 
             return [];
         }
 
-        return collect($response->json('queue', []))
+        $queue = collect($response->json('queue', []))
             ->filter()
             ->filter(fn (array $track) => ($track['type'] ?? 'track') === 'track')
             ->map(fn (array $track) => [
@@ -274,20 +328,28 @@ class SpotifyWebApiClient implements SpotifyClientContract
             ])
             ->values()
             ->all();
+
+        Cache::put($key, $queue, self::QUEUE_TTL_SECONDS);
+
+        return $queue;
     }
 
     public function getPlaybackState(): ?array
     {
-        $response = $this->http()->get('https://api.spotify.com/v1/me/player');
+        $response = $this->get('https://api.spotify.com/v1/me/player');
+
+        if (! $response) {
+            throw new SpotifyRequestFailed('Spotify playback state could not be fetched');
+        }
 
         if ($response->status() === 204) {
             return null;
         }
 
-        if ($response->failed()) {
-            Log::warning('Spotify playback state fetch failed', ['status' => $response->status(), 'body' => $response->body()]);
+        if (! $response || $response->failed()) {
+            Log::warning('Spotify playback state fetch failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
-            return null;
+            throw new SpotifyRequestFailed('Spotify playback state fetch failed with status '.$response->status());
         }
 
         $json = $response->json();
@@ -340,31 +402,65 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     private function putWithQuery(string $url, array $query, array $body): bool
     {
-        $request = $this->http()->asJson();
-
         if (! empty($query)) {
             $url .= '?'.http_build_query($query);
         }
 
-        $response = $request->put($url, $body);
+        $response = $this->send('put', $url, $body);
+        $this->forgetCachedReads();
 
-        if ($response->failed()) {
+        if (! $response || $response->failed()) {
             Log::warning('Spotify playback command failed', [
                 'url' => $url,
-                'status' => $response->status(),
-                'body' => $response->body(),
+                'status' => $response?->status(),
+                'body' => $response?->body(),
             ]);
         }
 
-        return $response->successful();
+        return (bool) $response?->successful();
     }
 
-    private function http(): PendingRequest
+    private function get(string $url, array $query = []): ?Response
+    {
+        return $this->attempt(fn () => $this->http(self::READ_TIMEOUT_SECONDS)->get($url, $query));
+    }
+
+    private function send(string $method, string $url, array $body = []): ?Response
+    {
+        return $this->attempt(function () use ($method, $url, $body) {
+            $request = $this->http(self::COMMAND_TIMEOUT_SECONDS)->asJson();
+
+            return $method === 'put' ? $request->put($url, $body) : $request->post($url);
+        });
+    }
+
+    /**
+     * Null means "no usable answer": the request couldn't be made at all
+     * (timeout, DNS, connection refused, which Laravel throws instead of
+     * returning a failed response) or this account is flagged as needing a
+     * reconnect. Callers handle that the same way as an error response.
+     */
+    private function attempt(callable $call): ?Response
+    {
+        try {
+            return $call();
+        } catch (ConnectionException|SpotifyRequestFailed $e) {
+            Log::warning('Spotify request not made or not answered', ['reason' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    private function http(int $timeoutSeconds): PendingRequest
     {
         app(SpotifyTokenManager::class)->ensureFreshToken($this->account);
 
+        if ($this->account->needsReconnect()) {
+            throw new SpotifyRequestFailed('Spotify connection needs to be reconnected');
+        }
+
         return Http::withToken($this->account->access_token)
             ->acceptJson()
-            ->timeout(10);
+            ->timeout($timeoutSeconds);
     }
 }
