@@ -29,8 +29,13 @@
             </div>
 
             <div class="relative flex-1 min-h-0">
+                {{-- The picture people see is this canvas, painted frame by frame
+                     from the video. The video is only the frame source, kept
+                     tiny: iOS can paint a live camera <video> solid black even
+                     while it delivers frames, but never does that to a canvas. --}}
+                <canvas x-ref="preview" class="absolute inset-0 w-full h-full"></canvas>
                 <video x-ref="video" playsinline webkit-playsinline muted autoplay disablepictureinpicture
-                       class="absolute inset-0 w-full h-full object-cover"></video>
+                       class="absolute left-0 top-0 w-px h-px pointer-events-none"></video>
                 <canvas x-ref="canvas" class="hidden"></canvas>
 
                 <div x-show="status === 'scanning' || status === 'starting'" class="absolute inset-0 flex flex-col pointer-events-none">
@@ -56,6 +61,8 @@
                     </div>
                 </div>
             </div>
+
+            <pre x-show="debug && debugInfo" x-text="debugInfo" class="px-4 py-2 text-[10px] leading-snug text-green-300 bg-black/80 whitespace-pre-wrap break-all"></pre>
 
             <div class="px-6 py-5 text-center min-h-[4.5rem]">
                 <p class="text-sm text-white/80" x-show="status === 'starting'">Starting camera&hellip;</p>

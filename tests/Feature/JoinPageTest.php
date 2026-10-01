@@ -49,4 +49,15 @@ class JoinPageTest extends TestCase
         // Attached-at-attach-time attributes iOS needs on the video element.
         $this->assertMatchesRegularExpression('/<video[^>]*\bplaysinline\b[^>]*\bmuted\b/', $html);
     }
+
+    public function test_scanner_shows_a_canvas_preview_not_the_video_element(): void
+    {
+        $html = $this->get('/join')->getContent();
+
+        // The visible picture is a canvas painted from the video, because a
+        // live camera <video> can paint black on iPhones while delivering frames.
+        $this->assertStringContainsString('x-ref="preview"', $html);
+        $this->assertDoesNotMatchRegularExpression('/<video[^>]*x-ref="video"[^>]*\binset-0\b/', $html);
+        $this->assertDoesNotMatchRegularExpression('/<video[^>]*\bobject-cover\b/', $html);
+    }
 }

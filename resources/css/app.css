@@ -181,3 +181,11 @@ input[type='range']::-moz-range-thumb {
         animation: none;
     }
 }
+
+/* Set while the QR scanner is open. The aurora's animated, heavily blurred
+   SVG plus a live camera feed can starve a phone's compositor, and nothing
+   behind the full-screen scanner is visible anyway. */
+.scanner-open .green-waves,
+.scanner-open .ambient-grain {
+    display: none;
+}

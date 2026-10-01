@@ -10,11 +10,28 @@ export function extractInviteCode(text) {
     return match ? match[0].toUpperCase() : null;
 }
 
+// Long side, in pixels, of the frame handed to the decoder. Big enough that a
+// QR on a monitor across the room is still resolvable, small enough to
+// decode several times a second on a phone.
+const DECODE_MAX_SIDE = 960;
+
+// A frame this dark on average, for this long, means the camera is "on" but
+// delivering black (covered lens, or a broken feed), not a dim room.
+const BLACK_MEAN_LUMA = 6;
+const BLACK_FOR_MS = 4000;
+
 document.addEventListener('alpine:init', () => {
     // Why this exists at all: an installed PWA can't hand a QR to the system
     // camera app and get the link back into itself (the link opens in the
     // browser instead, with separate storage), so people had to type the
     // code by hand. This scans inside the app and fills the field.
+    //
+    // The visible preview is a <canvas> this code paints each frame, not the
+    // <video> element. On real iPhones a live camera <video> can report
+    // frames yet paint solid black (hardware video layers are fragile
+    // inside anything clipped, blended or animated), while drawing the very
+    // same frames to a canvas works. The video stays in the DOM, playing,
+    // purely as the frame source.
     Alpine.data('qrScanner', (targetId, nextFocusId = null) => ({
         open: false,
         // idle | starting | scanning | denied | unavailable | nopicture | error
@@ -22,15 +39,28 @@ document.addEventListener('alpine:init', () => {
         notice: '',
         supported: !!navigator.mediaDevices?.getUserMedia,
 
+        // ?scanDebug=1 on the page shows live diagnostics inside the scanner,
+        // for working out what a specific phone is doing without a Mac.
+        debug: new URLSearchParams(location.search).has('scanDebug'),
+        debugInfo: '',
+
         stream: null,
         frame: null,
-        lastScan: 0,
+        lastDecode: 0,
+        darkSince: null,
+        decodedFrames: 0,
         decode: null,
 
         async start() {
             this.open = true;
             this.status = 'starting';
             this.notice = '';
+            this.darkSince = null;
+            this.decodedFrames = 0;
+
+            // The animated, blurred aurora is expensive; with the camera
+            // running as well it can starve a phone's compositor.
+            document.documentElement.classList.add('scanner-open');
 
             try {
                 // Loaded on first use only, so the decoder isn't part of the
@@ -89,8 +119,8 @@ document.addEventListener('alpine:init', () => {
             throw lastError;
         },
 
-        // A camera that's "on" but never delivers a frame is the black-screen
-        // failure: without this it just sits there forever. Resolves once
+        // A camera that's "on" but never delivers a frame is a failure mode
+        // of its own: without this it just sits there forever. Resolves once
         // real frames arrive, rejects after 5s so the person gets a message
         // and a way out instead.
         waitForPicture(video) {
@@ -144,13 +174,18 @@ document.addEventListener('alpine:init', () => {
             }
 
             const video = this.$refs.video;
-            const now = performance.now();
 
-            // ~8 scans a second is plenty for a QR code held still, and keeps
-            // a phone from heating up decoding every single frame.
-            if (video.readyState >= 2 && video.videoWidth && now - this.lastScan > 120) {
-                this.lastScan = now;
-                this.scanFrame(video);
+            if (video.readyState >= 2 && video.videoWidth) {
+                this.paintPreview(video);
+
+                const now = performance.now();
+
+                // ~6 decodes a second is plenty for a QR held still, and keeps
+                // a phone from heating up. The preview itself runs every frame.
+                if (now - this.lastDecode > 160) {
+                    this.lastDecode = now;
+                    this.scanFrame(video);
+                }
             }
 
             if (this.status === 'scanning') {
@@ -158,9 +193,51 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        // Draws the camera frame, cropped to fill the preview the way
+        // object-fit: cover would, onto the visible canvas.
+        paintPreview(video) {
+            const canvas = this.$refs.preview;
+            const box = canvas.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            let width = Math.round(box.width * dpr);
+            let height = Math.round(box.height * dpr);
+
+            if (!width || !height) {
+                return;
+            }
+
+            const longest = Math.max(width, height);
+
+            if (longest > DECODE_MAX_SIDE) {
+                width = Math.round(width * (DECODE_MAX_SIDE / longest));
+                height = Math.round(height * (DECODE_MAX_SIDE / longest));
+            }
+
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+            }
+
+            const scale = Math.max(width / video.videoWidth, height / video.videoHeight);
+            const sourceWidth = width / scale;
+            const sourceHeight = height / scale;
+
+            canvas.getContext('2d').drawImage(
+                video,
+                (video.videoWidth - sourceWidth) / 2,
+                (video.videoHeight - sourceHeight) / 2,
+                sourceWidth,
+                sourceHeight,
+                0,
+                0,
+                width,
+                height,
+            );
+        },
+
         scanFrame(video) {
             const canvas = this.$refs.canvas;
-            const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+            const scale = Math.min(1, DECODE_MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
             canvas.width = Math.round(video.videoWidth * scale);
             canvas.height = Math.round(video.videoHeight * scale);
 
@@ -168,6 +245,18 @@ document.addEventListener('alpine:init', () => {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const image = context.getImageData(0, 0, canvas.width, canvas.height);
+            this.decodedFrames++;
+
+            const brightness = this.meanBrightness(image.data);
+
+            if (this.updateDarkness(brightness)) {
+                return;
+            }
+
+            if (this.debug) {
+                this.debugInfo = this.diagnostics(video, canvas, brightness);
+            }
+
             const result = this.decode(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
 
             if (!result) {
@@ -183,6 +272,52 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.notice = "That QR code isn't an AuxRoom invite.";
+        },
+
+        // Cheap: samples a sparse grid of pixels rather than all of them.
+        meanBrightness(data) {
+            let total = 0;
+            let samples = 0;
+
+            for (let i = 0; i < data.length; i += 4 * 97) {
+                total += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                samples++;
+            }
+
+            return samples ? total / samples : 0;
+        },
+
+        // True once the feed has been black long enough to give up on it.
+        updateDarkness(brightness) {
+            if (brightness >= BLACK_MEAN_LUMA) {
+                this.darkSince = null;
+
+                return false;
+            }
+
+            this.darkSince ??= performance.now();
+
+            if (performance.now() - this.darkSince < BLACK_FOR_MS) {
+                return false;
+            }
+
+            console.error('QR scanner: the camera is delivering black frames');
+            this.stop();
+            this.status = 'nopicture';
+
+            return true;
+        },
+
+        diagnostics(video, canvas, brightness) {
+            const track = this.stream?.getVideoTracks()[0];
+            const settings = track?.getSettings?.() ?? {};
+
+            return [
+                `video ${video.videoWidth}x${video.videoHeight} ready=${video.readyState} paused=${video.paused} t=${video.currentTime.toFixed(1)}`,
+                `track ${settings.width ?? '?'}x${settings.height ?? '?'} ${settings.facingMode ?? '?'} state=${track?.readyState} muted=${track?.muted}`,
+                `decode ${canvas.width}x${canvas.height} frames=${this.decodedFrames} brightness=${brightness.toFixed(1)}`,
+                navigator.userAgent,
+            ].join('\n');
         },
 
         fill(code) {
@@ -214,6 +349,8 @@ document.addEventListener('alpine:init', () => {
             if (this.$refs.video) {
                 this.$refs.video.srcObject = null;
             }
+
+            document.documentElement.classList.remove('scanner-open');
         },
 
         close() {
