@@ -17,7 +17,7 @@ document.addEventListener('alpine:init', () => {
     // code by hand. This scans inside the app and fills the field.
     Alpine.data('qrScanner', (targetId, nextFocusId = null) => ({
         open: false,
-        // idle | starting | scanning | denied | unavailable | error
+        // idle | starting | scanning | denied | unavailable | nopicture | error
         status: 'idle',
         notice: '',
         supported: !!navigator.mediaDevices?.getUserMedia,
@@ -37,24 +37,89 @@ document.addEventListener('alpine:init', () => {
                 // bundle every page pays for.
                 this.decode ??= (await import('jsqr')).default;
 
-                this.stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: false,
-                });
+                this.stream = await this.openCamera();
 
                 const video = this.$refs.video;
-                video.srcObject = this.stream;
-                // iOS refuses inline playback without these, and shows its own fullscreen player.
-                video.setAttribute('playsinline', '');
+
+                // All of this goes on before the stream is attached: iOS
+                // decides inline playback and autoplay eligibility at attach
+                // time, and gets it wrong (black frame) if it's set after.
                 video.muted = true;
-                await video.play();
+                video.autoplay = true;
+                video.setAttribute('muted', '');
+                video.setAttribute('playsinline', '');
+                video.setAttribute('webkit-playsinline', '');
+                video.srcObject = this.stream;
+
+                await this.waitForPicture(video);
 
                 this.status = 'scanning';
                 this.frame = requestAnimationFrame(() => this.tick());
             } catch (error) {
+                console.error('QR scanner could not start the camera', error);
                 this.stop();
                 this.status = this.statusFor(error);
             }
+        },
+
+        // Tries progressively simpler requests: some devices reject the
+        // resolution hints or have no camera that matches facingMode, and
+        // that shouldn't read as "no camera". A permission denial is final
+        // and is never retried.
+        async openCamera() {
+            const attempts = [
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+                { video: { facingMode: 'environment' }, audio: false },
+                { video: true, audio: false },
+            ];
+            let lastError;
+
+            for (const constraints of attempts) {
+                try {
+                    return await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (error) {
+                    lastError = error;
+
+                    if (!['OverconstrainedError', 'NotFoundError', 'TypeError'].includes(error?.name)) {
+                        throw error;
+                    }
+                }
+            }
+
+            throw lastError;
+        },
+
+        // A camera that's "on" but never delivers a frame is the black-screen
+        // failure: without this it just sits there forever. Resolves once
+        // real frames arrive, rejects after 5s so the person gets a message
+        // and a way out instead.
+        waitForPicture(video) {
+            return new Promise((resolve, reject) => {
+                const startedAt = performance.now();
+
+                video.play().catch((error) => {
+                    console.error('Camera video could not start playing', error);
+                    reject(Object.assign(new Error('play() was rejected'), { name: 'NoPictureError' }));
+                });
+
+                const check = () => {
+                    if (video.videoWidth > 0 && video.readyState >= 2) {
+                        resolve();
+
+                        return;
+                    }
+
+                    if (performance.now() - startedAt > 5000) {
+                        reject(Object.assign(new Error('The camera opened but produced no picture'), { name: 'NoPictureError' }));
+
+                        return;
+                    }
+
+                    setTimeout(check, 100);
+                };
+
+                check();
+            });
         },
 
         statusFor(error) {
@@ -66,6 +131,8 @@ document.addEventListener('alpine:init', () => {
                 case 'OverconstrainedError':
                 case 'NotReadableError':
                     return 'unavailable';
+                case 'NoPictureError':
+                    return 'nopicture';
                 default:
                     return 'error';
             }

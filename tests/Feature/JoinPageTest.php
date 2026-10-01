@@ -35,4 +35,18 @@ class JoinPageTest extends TestCase
             $this->assertSame(1, substr_count($this->get($path)->getContent(), '/livewire/livewire.js'), $path);
         }
     }
+
+    public function test_scanner_overlay_avoids_the_patterns_that_black_out_ios_safari(): void
+    {
+        $html = $this->get('/join')->getContent();
+
+        // Teleported out of the overflow-hidden, rounded form card.
+        $this->assertStringContainsString('x-teleport="body"', $html);
+
+        // No giant spread box-shadow cutout (a ~20,000px layer on iOS).
+        $this->assertStringNotContainsString('9999px', $html);
+
+        // Attached-at-attach-time attributes iOS needs on the video element.
+        $this->assertMatchesRegularExpression('/<video[^>]*\bplaysinline\b[^>]*\bmuted\b/', $html);
+    }
 }
