@@ -30,6 +30,11 @@
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-aux-accent">
                         <x-icon name="note" class="w-3.5 h-3.5" /> {{ $spotifyDisconnected ? 'Spotify disconnected' : ($noDeviceAvailable ? 'No device found' : ($playlistFinished ? 'Playlist finished' : ($room->is_playing ? 'Now spinning' : 'On pause'))) }}
                     </span>
+                    @if ($room->smartShuffleOn() && ! $spotifyDisconnected && ! $noDeviceAvailable)
+                        <span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-aux-accent-soft text-aux-accent text-[10px] font-semibold align-middle" title="Spotify shuffles the playlist and mixes in recommended songs">
+                            <x-icon name="zap" class="w-3 h-3" /> Smart Shuffle
+                        </span>
+                    @endif
                     <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($playlistFinished ? 'End of the playlist' : ($room->fallbackIsShown() ? $room->fallback_playlist_name : ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($noDeviceAvailable ? 'Nothing\'s playing anywhere' : 'Nothing queued yet')))) }}</h2>
                     <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($playlistFinished ? 'Press play to start it again.' : ($room->fallbackIsShown() ? 'Playlist · shuffled' : ($spotifyDisconnected ? ($this->isHost ? 'Reconnect it in Room Settings.' : 'The host needs to reconnect Spotify.') : ($noDeviceAvailable ? 'Open Spotify on a phone, computer, or speaker, then come back here.' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track'))))) }}</p>
 
@@ -54,8 +59,11 @@
                                 <span class="hidden sm:inline px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-semibold text-aux-muted">SAMPLE TRACK</span>
                             @endif
                             <button wire:click="toggleShuffle" @disabled(! $this->canGuest('guests_can_play_pause'))
-                                    class="disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
+                                    class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
                                 <x-icon name="shuffle" class="w-4 h-4" />
+                                @if ($room->smartShuffleOn())
+                                    <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black flex items-center justify-center" title="Smart Shuffle"><x-icon name="zap" class="w-2 h-2" /></span>
+                                @endif
                             </button>
                             {{-- Text labels match the bottom bar's icon-only convention below sm --}}
                             <button wire:click="previous" @disabled(! $this->canGuest('guests_can_skip'))
@@ -140,7 +148,7 @@
             @if ($room->shuffle_enabled && $playlistItems->isNotEmpty())
                 <p class="mt-5 pt-4 border-t border-aux-border text-[11px] text-aux-faint">
                     <x-icon name="shuffle" class="w-3 h-3 inline -mt-0.5" />
-                    Shuffle is on, so Spotify doesn't report the real shuffled order. Upcoming tracks from the playlist can't be shown reliably here, but songs queued above are unaffected.
+                    {{ $room->smartShuffleOn() ? 'Smart Shuffle is on: Spotify shuffles the playlist and mixes in recommended songs that are not in it. It' : 'Shuffle is on, so Spotify' }} doesn't report the real shuffled order. Upcoming tracks from the playlist can't be shown reliably here, but songs queued above are unaffected.
                 </p>
             @elseif ($playlistItems->isNotEmpty())
                 <p class="mt-5 pt-4 border-t border-aux-border text-[10px] uppercase tracking-widest text-aux-text">

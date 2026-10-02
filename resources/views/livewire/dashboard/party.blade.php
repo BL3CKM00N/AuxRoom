@@ -136,7 +136,7 @@
         @if ($room->shuffle_enabled)
             <div class="mt-12">
                 <p class="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest text-aux-faint">
-                    <x-icon name="shuffle" class="w-4 h-4" /> Shuffle is on, up next is a surprise
+                    <x-icon name="shuffle" class="w-4 h-4" /> {{ $room->smartShuffleOn() ? 'Smart Shuffle is on, up next is a surprise (with recommendations mixed in)' : 'Shuffle is on, up next is a surprise' }}
                 </p>
             </div>
         @elseif ($this->upNext->isNotEmpty())

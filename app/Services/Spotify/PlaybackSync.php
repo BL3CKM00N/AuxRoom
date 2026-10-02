@@ -90,7 +90,8 @@ class PlaybackSync
         $drifted = abs($state['progress_ms'] - $room->currentPositionMs()) > 3000;
         $playStateChanged = $state['is_playing'] !== $room->is_playing;
         $fallbackFlagChanged = $isFallbackContext !== $room->is_playing_fallback;
-        $shuffleChanged = $state['shuffle_enabled'] !== $room->shuffle_enabled;
+        $shuffleChanged = $state['shuffle_enabled'] !== $room->shuffle_enabled
+            || $state['smart_shuffle_enabled'] !== $room->smart_shuffle_enabled;
         $repeatChanged = $state['repeat_mode'] !== $room->repeat_mode;
         $contextChanged = $state['context_uri'] !== $room->now_playing_context_uri;
         $wasInactive = $room->playback_inactive_at !== null;
@@ -112,6 +113,7 @@ class PlaybackSync
             'now_playing_position_ms' => $state['progress_ms'],
             'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
             'shuffle_enabled' => $state['shuffle_enabled'],
+            'smart_shuffle_enabled' => $state['smart_shuffle_enabled'],
             'repeat_mode' => $state['repeat_mode'],
             'playback_inactive_at' => null,
             'playlist_finished_at' => $this->finishedAt($room, $state, $trackChanged, $finished),

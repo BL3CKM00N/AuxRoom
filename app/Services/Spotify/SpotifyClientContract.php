@@ -96,7 +96,7 @@ interface SpotifyClientContract
      * request throws SpotifyRequestFailed instead, so an outage or rate limit
      * is never mistaken for "no device".
      *
-     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int, context_uri: ?string, shuffle_enabled: bool, repeat_mode: string}|null
+     * @return array{is_playing: bool, progress_ms: int, track_id: ?string, device_id: ?string, name: ?string, artist: ?string, album_art_url: ?string, duration_ms: int, context_uri: ?string, shuffle_enabled: bool, smart_shuffle_enabled: bool, repeat_mode: string}|null
      *
      * @throws SpotifyRequestFailed
      */

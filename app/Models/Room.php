@@ -38,6 +38,7 @@ class Room extends Model
         'playback_inactive_at',
         'playlist_finished_at',
         'shuffle_enabled',
+        'smart_shuffle_enabled',
         'repeat_mode',
         'volume_percent',
     ];
@@ -49,6 +50,7 @@ class Room extends Model
             'guests_can_add_to_queue' => 'boolean',
             'is_playing_fallback' => 'boolean',
             'shuffle_enabled' => 'boolean',
+            'smart_shuffle_enabled' => 'boolean',
             'location_enforced' => 'boolean',
             'location_lat' => 'float',
             'location_lng' => 'float',
@@ -181,6 +183,12 @@ class Room extends Model
     public function playbackInactive(): bool
     {
         return $this->playback_inactive_at !== null && ! $this->is_playing;
+    }
+
+    /** Spotify's Smart Shuffle is on: shuffled, with recommended songs mixed in. Only meaningful while shuffle is. */
+    public function smartShuffleOn(): bool
+    {
+        return $this->shuffle_enabled && $this->smart_shuffle_enabled;
     }
 
     /**

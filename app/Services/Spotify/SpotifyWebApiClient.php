@@ -441,6 +441,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'duration_ms' => (int) ($item['duration_ms'] ?? 0),
             'context_uri' => $json['context']['uri'] ?? null,
             'shuffle_enabled' => (bool) ($json['shuffle_state'] ?? false),
+            // Not in Spotify's docs, but present in the player state (true only alongside shuffle_state).
+            'smart_shuffle_enabled' => (bool) ($json['smart_shuffle'] ?? false),
             'repeat_mode' => $json['repeat_state'] ?? 'off',
         ];
     }

@@ -160,7 +160,8 @@ class InspectSpotify extends Command
 
         $this->components->twoColumnDetail('Current track', ($item['name'] ?? '(none)').' ('.($item['id'] ?? '-').')');
         $this->components->twoColumnDetail('Playing / progress', (($state['is_playing'] ?? false) ? 'playing' : 'paused').' / '.round(($state['progress_ms'] ?? 0) / 1000).'s of '.round(($item['duration_ms'] ?? 0) / 1000).'s');
-        $this->components->twoColumnDetail('Shuffle / repeat', (($state['shuffle_state'] ?? false) ? 'on' : 'off').' / '.($state['repeat_state'] ?? '?'));
+        $shuffle = ! ($state['shuffle_state'] ?? false) ? 'off' : (($state['smart_shuffle'] ?? false) ? 'smart shuffle' : 'on');
+        $this->components->twoColumnDetail('Shuffle / repeat', $shuffle.' / '.($state['repeat_state'] ?? '?'));
         $this->components->twoColumnDetail('Context', $context ? "{$context['type']}  {$contextUri}" : '(none: a single track, the queue, or radio)');
 
         $disallows = array_keys(array_filter($state['actions']['disallows'] ?? []));

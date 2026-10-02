@@ -186,7 +186,8 @@ trait HandlesPlayback
             return;
         }
 
-        $this->room->update(['shuffle_enabled' => $enabled, 'last_local_command_at' => now()]);
+        // Spotify's shuffle command sets plain shuffle either way; the next sync corrects this if it differs.
+        $this->room->update(['shuffle_enabled' => $enabled, 'smart_shuffle_enabled' => false, 'last_local_command_at' => now()]);
         $this->broadcastUpdate('playback');
     }
 

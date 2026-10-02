@@ -98,8 +98,11 @@
         <div class="flex-1 flex flex-col items-center gap-1 min-w-0">
             <div class="flex items-center gap-4">
                 <button wire:click="toggleShuffle" @disabled(! $this->canGuest('guests_can_play_pause'))
-                        class="disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
+                        class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
                     <x-icon name="shuffle" class="w-4 h-4" />
+                    @if ($room->smartShuffleOn())
+                        <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black flex items-center justify-center" title="Smart Shuffle"><x-icon name="zap" class="w-2 h-2" /></span>
+                    @endif
                 </button>
                 <button wire:click="previous" @disabled((! $this->nowPlaying && ! $room->fallbackIsShown()) || ! $this->canGuest('guests_can_skip'))
                         class="text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
