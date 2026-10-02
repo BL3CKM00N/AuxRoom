@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'AuxRoom') }}</title>
+        <title>{{ ($preview ?? null)?->title ?? config('app.name', 'AuxRoom') }}</title>
 
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
         <x-pwa-meta />
@@ -13,7 +13,12 @@
              <x-guest-layout> (see App\View\Components\GuestLayout). Livewire
              Volt pages reach it directly via #[Layout('layouts.guest')]
              instead, which never defines them. --}}
-        <x-social-meta :title="$ogTitle ?? null" :description="$ogDescription ?? null" />
+        <x-social-meta :title="($preview ?? null)?->title ?? $ogTitle ?? null"
+                       :description="($preview ?? null)?->description ?? $ogDescription ?? null"
+                       :url="($preview ?? null)?->url"
+                       :noindex="($preview ?? null)?->noindex ?? false"
+                       :image="($preview ?? null)?->image"
+                       :image-square="($preview ?? null)?->imageSquare" />
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

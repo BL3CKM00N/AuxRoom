@@ -39,6 +39,17 @@
      :class="controlsVisible ? '' : 'cursor-none'"
      class="flex-1 bg-aux-bg text-aux-text flex flex-col relative">
 
+    {{-- Everything here is sized in rem, so scaling the root font size scales
+         the whole screen with the display. The sizes below were tuned on a 4K
+         screen (2160px tall = 16px root), where 1080p showed the same layout
+         twice as big in proportion and overflowed. Anything that is a normal
+         small or portrait screen keeps the default size. --}}
+    <style>
+        @media (min-width: 1024px) and (orientation: landscape) {
+            html { font-size: clamp(8px, calc(100vh / 135), 40px); }
+        }
+    </style>
+
     <x-ambient-background />
 
     {{-- No pointer-events-none here: the only thing that brings faded
@@ -69,7 +80,7 @@
     {{-- Listener count moves to the opposite corner on mobile, where the
          QR/invite block is a popup trigger instead of sitting inline. --}}
     <div class="sm:hidden absolute top-6 left-6 z-20">
-        <span class="inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
+        <span class="inline-flex items-center gap-1.5 text-[0.6875rem] text-aux-faint">
             <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
         </span>
     </div>
@@ -100,7 +111,7 @@
         <p class="mt-3 text-xl lg:text-2xl xl:text-3xl text-aux-muted">{{ $this->nowPlaying->artist ?? ($spotifyDisconnected ? 'Ask the host to reconnect Spotify' : ($noDeviceAvailable ? 'Ask the host to open Spotify on a device' : ($playlistFinished ? 'Add a song, or ask the host to press play to start it again' : 'Scan the code to join and add a song'))) }}</p>
 
         @if ($this->nowPlaying && ! $spotifyDisconnected)
-            <span class="mt-4 inline-flex px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full bg-white/5 text-[11px] lg:text-sm font-semibold text-aux-muted">
+            <span class="mt-4 inline-flex px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full bg-white/5 text-[0.6875rem] lg:text-sm font-semibold text-aux-muted">
                 {{ $room->is_playing ? 'PLAYING' : 'PAUSED' }}
             </span>
 
@@ -111,7 +122,7 @@
                 <div class="h-1.5 lg:h-2 bg-white/10 rounded-full overflow-hidden">
                     <div class="h-full bg-aux-accent" :style="`width: ${seekPct}%`"></div>
                 </div>
-                <div class="mt-2 flex justify-between text-[11px] lg:text-sm text-aux-faint">
+                <div class="mt-2 flex justify-between text-[0.6875rem] lg:text-sm text-aux-faint">
                     <span x-text="formatMs(positionMs)"></span>
                     <span x-text="formatMs(durationMs)"></span>
                 </div>
@@ -160,14 +171,14 @@
         {{-- Larger screens: small always-visible QR + code in the corner,
              with room to sit there without colliding with anything. --}}
         <div class="hidden sm:flex sm:absolute sm:bottom-6 sm:right-6 items-end justify-end gap-3">
-            <span class="mb-1 inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
+            <span class="mb-1 inline-flex items-center gap-1.5 text-[0.6875rem] text-aux-faint">
                 <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
             </span>
-            <div class="w-[100px] text-center">
-                <div class="p-2 bg-white rounded-lg">
+            <div class="w-[6.25rem] text-center">
+                <div class="p-2 bg-white rounded-lg [&>svg]:w-full [&>svg]:h-auto [&>svg]:block">
                     {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(84)->generate(route('join', ['code' => $room->invite_code])) !!}
                 </div>
-                <p class="mt-1 text-[11px] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
+                <p class="mt-1 text-[0.6875rem] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
             </div>
         </div>
     </div>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\RoomController;
+use App\Http\Controllers\ShareImageController;
 use App\Http\Controllers\SpotifyConnectionController;
 use App\Livewire\Dashboard\PartyScreen;
 use App\Livewire\Dashboard\ShowRoom;
@@ -11,6 +12,12 @@ Route::view('/', 'welcome');
 
 Route::get('/join', [JoinController::class, 'create'])->name('join');
 // Throttled because every successful submit creates a guest member row.
+// The invite link's preview picture, fetched by chat apps' link crawlers.
+Route::get('/share/{code}/{shape}.jpg', [ShareImageController::class, 'show'])
+    ->where('shape', 'wide|square')
+    ->middleware('throttle:120,1')
+    ->name('share.image');
+
 Route::post('/join', [JoinController::class, 'store'])->middleware('throttle:10,1')->name('join.store');
 
 // Your room, if you're hosting one — otherwise mount() bounces to rooms.create.

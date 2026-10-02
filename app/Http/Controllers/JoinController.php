@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Room;
 use App\Services\RoomMembership;
+use App\Support\SharePreview;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,7 @@ class JoinController extends Controller
     {
         return view('join', [
             'code' => $request->query('code'),
+            'preview' => SharePreview::forJoin($request->query('code')),
         ]);
     }
 

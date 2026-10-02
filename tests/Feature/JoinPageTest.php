@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class JoinPageTest extends TestCase
 {
+    // The page now looks the code up to word its link preview.
+    use RefreshDatabase;
+
     public function test_join_page_offers_qr_scanning_wired_to_the_invite_code_field(): void
     {
         $html = $this->get('/join')->assertOk()->getContent();

@@ -9,6 +9,9 @@
 
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
         <x-pwa-meta />
+        @isset($preview)
+            <x-social-meta :title="$preview->title" :description="$preview->description" :url="$preview->url" :noindex="$preview->noindex" />
+        @endisset
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />

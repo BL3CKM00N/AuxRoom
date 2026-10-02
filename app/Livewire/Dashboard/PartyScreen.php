@@ -6,6 +6,7 @@ use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\Room;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\UpcomingQueue;
+use App\Support\SharePreview;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -74,6 +75,6 @@ class PartyScreen extends Component
         );
 
         return view('livewire.dashboard.party')
-            ->layout('layouts.room', ['title' => 'Party screen']);
+            ->layout('layouts.room', ['title' => 'Party screen', 'preview' => SharePreview::forParty($this->room)]);
     }
 }
