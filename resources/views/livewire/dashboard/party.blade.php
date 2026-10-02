@@ -39,6 +39,21 @@
      :class="controlsVisible ? '' : 'cursor-none'"
      class="flex-1 bg-aux-bg text-aux-text flex flex-col relative">
 
+    {{-- Everything here is sized in rem, so the root font size scales the whole
+         screen. The layout is up to ~74rem tall (art, a title that wraps to two
+         lines, progress, up-next wrapping to two rows, padding), so the size is
+         whatever lets ~76rem fit the window's height (84rem, then 10% bigger),
+         leaving slack for a longer title:
+         a 1080p screen has only ~960px once the browser's own bars are gone,
+         and at the default 16px the bottom (up next, the QR code) was cut off.
+         It never goes above 16px on screens up to 4K, so those look as before,
+         and keeps growing on bigger ones. Phones and portrait keep the default. --}}
+    <style>
+        @media (min-width: 1024px) and (orientation: landscape) {
+            html { font-size: clamp(8px, calc(min(calc(100vh / 84), max(16px, calc(100vh / 135))) * 1.1), 44px); }
+        }
+    </style>
+
     <x-ambient-background />
 
     {{-- No pointer-events-none here: the only thing that brings faded
@@ -69,7 +84,7 @@
     {{-- Listener count moves to the opposite corner on mobile, where the
          QR/invite block is a popup trigger instead of sitting inline. --}}
     <div class="sm:hidden absolute top-6 left-6 z-20">
-        <span class="inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
+        <span class="inline-flex items-center gap-1.5 text-[0.6875rem] text-aux-faint">
             <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
         </span>
     </div>
@@ -100,7 +115,7 @@
         <p class="mt-3 text-xl lg:text-2xl xl:text-3xl text-aux-muted">{{ $this->nowPlaying->artist ?? ($spotifyDisconnected ? 'Ask the host to reconnect Spotify' : ($noDeviceAvailable ? 'Ask the host to open Spotify on a device' : ($playlistFinished ? 'Add a song, or ask the host to press play to start it again' : 'Scan the code to join and add a song'))) }}</p>
 
         @if ($this->nowPlaying && ! $spotifyDisconnected)
-            <span class="mt-4 inline-flex px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full bg-white/5 text-[11px] lg:text-sm font-semibold text-aux-muted">
+            <span class="mt-4 inline-flex px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full bg-white/5 text-[0.6875rem] lg:text-sm font-semibold text-aux-muted">
                 {{ $room->is_playing ? 'PLAYING' : 'PAUSED' }}
             </span>
 
@@ -111,7 +126,7 @@
                 <div class="h-1.5 lg:h-2 bg-white/10 rounded-full overflow-hidden">
                     <div class="h-full bg-aux-accent" :style="`width: ${seekPct}%`"></div>
                 </div>
-                <div class="mt-2 flex justify-between text-[11px] lg:text-sm text-aux-faint">
+                <div class="mt-2 flex justify-between text-[0.6875rem] lg:text-sm text-aux-faint">
                     <span x-text="formatMs(positionMs)"></span>
                     <span x-text="formatMs(durationMs)"></span>
                 </div>
@@ -125,13 +140,14 @@
                 </p>
             </div>
         @elseif ($this->upNext->isNotEmpty())
-            <div class="mt-12 w-full max-w-2xl lg:max-w-4xl">
+            {{-- Wide enough on big screens for all four cards in one row (4 x 20rem + gaps); it still wraps where the screen is narrower. --}}
+            <div class="mt-12 w-full max-w-2xl lg:max-w-[88rem]">
                 <p class="flex items-center justify-center gap-2 text-xs lg:text-sm font-semibold uppercase tracking-widest text-aux-accent">
                     <x-icon name="queue-list" class="w-4 h-4" /> Up next
                 </p>
                 <div class="mt-4 flex flex-wrap justify-center gap-3 lg:gap-4">
                     @foreach ($this->upNext as $item)
-                        <div class="flex items-center gap-3 pl-2 pr-4 py-2 lg:pl-3 lg:pr-5 lg:py-3 rounded-xl bg-aux-card border border-aux-border">
+                        <div class="flex items-center gap-3 pl-2 pr-4 py-2 lg:pl-3 lg:pr-5 lg:py-3 lg:w-80 min-w-0 rounded-xl bg-aux-card border border-aux-border">
                             <div class="w-9 h-9 lg:w-12 lg:h-12 rounded-md bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
                                 @if ($item->album_art_url)
                                     <img src="{{ $item->album_art_url }}" class="w-full h-full object-cover" alt="">
@@ -160,14 +176,14 @@
         {{-- Larger screens: small always-visible QR + code in the corner,
              with room to sit there without colliding with anything. --}}
         <div class="hidden sm:flex sm:absolute sm:bottom-6 sm:right-6 items-end justify-end gap-3">
-            <span class="mb-1 inline-flex items-center gap-1.5 text-[11px] text-aux-faint">
+            <span class="mb-1 inline-flex items-center gap-1.5 text-[0.6875rem] text-aux-faint">
                 <x-icon name="users" class="w-3.5 h-3.5" /> {{ $this->memberCount }}
             </span>
-            <div class="w-[100px] text-center">
-                <div class="p-2 bg-white rounded-lg">
+            <div class="w-[6.25rem] text-center">
+                <div class="p-2 bg-white rounded-lg [&>svg]:w-full [&>svg]:h-auto [&>svg]:block">
                     {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(84)->generate(route('join', ['code' => $room->invite_code])) !!}
                 </div>
-                <p class="mt-1 text-[11px] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
+                <p class="mt-1 text-[0.6875rem] font-semibold leading-tight text-aux-faint break-words">{{ $room->invite_code }}</p>
             </div>
         </div>
     </div>

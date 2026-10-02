@@ -27,7 +27,7 @@ class UpcomingQueue
     public function forRoom(Room $room): array
     {
         if ($this->clients->isMock($room) || ! $room->playbackProvider?->hasSpotifyConnected()) {
-            return [];
+            return $this->pendingQueueItems($room);
         }
 
         // Spotify parks on the first track after the playlist ends; its queue
@@ -49,6 +49,25 @@ class UpcomingQueue
             $contextIds,
             $room->queueItems()->whereNull('played_at')->pluck('spotify_track_id')->all(),
         );
+    }
+
+    /**
+     * Without Spotify there is no queue to read, so the room's own songs that
+     * haven't played yet are the queue (what guests added, in order).
+     *
+     * @return array<int, array>
+     */
+    private function pendingQueueItems(Room $room): array
+    {
+        return $room->pendingQueueItems()->get()->map(fn ($item) => [
+            'id' => $item->spotify_track_id,
+            'uri' => 'spotify:track:'.$item->spotify_track_id,
+            'name' => $item->name,
+            'artist' => $item->artist,
+            'album_art_url' => $item->album_art_url,
+            'duration_ms' => (int) $item->duration_ms,
+            'is_queued' => true,
+        ])->all();
     }
 
     /**
