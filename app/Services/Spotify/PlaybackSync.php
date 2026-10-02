@@ -5,6 +5,7 @@ namespace App\Services\Spotify;
 use App\Events\RoomUpdated;
 use App\Models\ActivityEvent;
 use App\Models\Room;
+use Illuminate\Support\Carbon;
 
 /**
  * Detects playback changes made outside AuxRoom — pausing, seeking, or
@@ -20,6 +21,9 @@ use App\Models\Room;
  */
 class PlaybackSync
 {
+    /** A track this close to its start, paused, is "parked", not something a person paused mid-song. */
+    private const PARKED_AT_START_MS = 3000;
+
     public function __construct(private SpotifyClientFactory $clients) {}
 
     /**
@@ -58,6 +62,7 @@ class PlaybackSync
             && $state['context_uri'] === $room->fallback_playlist_uri;
 
         $trackChanged = $state['track_id'] !== $room->now_playing_track_id;
+        $finished = $this->playlistJustFinished($room, $state, $trackChanged);
         $queueItemId = $room->now_playing_queue_item_id;
 
         if ($trackChanged) {
@@ -72,7 +77,7 @@ class PlaybackSync
             $matched?->update(['played_at' => now()]);
             $queueItemId = $matched?->id;
 
-            if (! $isFallbackContext && ! $matched && $state['track_id']) {
+            if (! $isFallbackContext && ! $matched && $state['track_id'] && ! $finished) {
                 ActivityEvent::create([
                     'room_id' => $room->id,
                     'member_id' => $actingMemberId,
@@ -87,15 +92,17 @@ class PlaybackSync
         $fallbackFlagChanged = $isFallbackContext !== $room->is_playing_fallback;
         $shuffleChanged = $state['shuffle_enabled'] !== $room->shuffle_enabled;
         $repeatChanged = $state['repeat_mode'] !== $room->repeat_mode;
+        $contextChanged = $state['context_uri'] !== $room->now_playing_context_uri;
         $wasInactive = $room->playback_inactive_at !== null;
 
-        if (! $wasInactive && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
+        if (! $wasInactive && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
             return;
         }
 
         $room->update([
             'now_playing_queue_item_id' => $queueItemId,
             'now_playing_track_id' => $state['track_id'],
+            'now_playing_context_uri' => $state['context_uri'],
             'now_playing_name' => $state['name'],
             'now_playing_artist' => $state['artist'],
             'now_playing_album_art_url' => $state['album_art_url'],
@@ -107,9 +114,43 @@ class PlaybackSync
             'shuffle_enabled' => $state['shuffle_enabled'],
             'repeat_mode' => $state['repeat_mode'],
             'playback_inactive_at' => null,
+            'playlist_finished_at' => $this->finishedAt($room, $state, $trackChanged, $finished),
         ]);
 
         RoomUpdated::broadcastFor($room, 'playback');
+    }
+
+    /**
+     * With repeat off, Spotify doesn't stop on the last track or report
+     * "nothing active": it rewinds the playlist to its first track and parks
+     * there, paused at the very start. A playing track that turns into a
+     * different, paused-at-zero track in the same playlist is that signature.
+     * It needs no knowledge of the playlist's order, so it also works for
+     * playlists Spotify won't let us read.
+     */
+    private function playlistJustFinished(Room $room, array $state, bool $trackChanged): bool
+    {
+        return $trackChanged
+            && $room->is_playing
+            && ! $state['is_playing']
+            && $state['progress_ms'] < self::PARKED_AT_START_MS
+            && $state['repeat_mode'] === 'off'
+            && Room::isPlayableContext($state['context_uri'])
+            && $state['context_uri'] === $room->now_playing_context_uri;
+    }
+
+    /** Stays set while the room is still parked there; anything else (playing, another track, moved on) clears it. */
+    private function finishedAt(Room $room, array $state, bool $trackChanged, bool $finished): ?Carbon
+    {
+        if ($finished) {
+            return now();
+        }
+
+        $stillParked = ! $trackChanged
+            && ! $state['is_playing']
+            && $state['progress_ms'] < self::PARKED_AT_START_MS;
+
+        return $stillParked ? $room->playlist_finished_at : null;
     }
 
     /**

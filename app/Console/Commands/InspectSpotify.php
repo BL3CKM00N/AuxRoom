@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Room;
 use App\Models\SpotifyAccount;
 use App\Services\Spotify\SpotifyTokenManager;
+use App\Services\Spotify\UpcomingQueue;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\File;
@@ -34,6 +35,9 @@ class InspectSpotify extends Command
         'linked_from', 'restrictions', 'popularity', 'disc_number', 'is_local', 'added_by', 'primary_color',
         'video_thumbnail', 'snapshot_id', 'followers', 'owner',
     ];
+
+    /** @var array<string, string> track id => name, from the queue just shown */
+    private array $queueNames = [];
 
     public function handle(SpotifyTokenManager $tokens): int
     {
@@ -189,6 +193,7 @@ class InspectSpotify extends Command
         foreach ($items as $i => $track) {
             $id = $track['id'] ?? null;
             $ids[] = $id;
+            $this->queueNames[$id] = $track['name'] ?? '?';
             $flags = [];
 
             if ($id && $id === $current) {
@@ -314,6 +319,19 @@ class InspectSpotify extends Command
         return $ids;
     }
 
+    /** Runs the same trimming the app applies, so what guests will see can be checked against real data. */
+    private function showWhatTheAppDisplays(array $state, array $queueIds, ?array $contextIds): void
+    {
+        $raw = array_map(fn (string $id) => ['id' => $id], $queueIds);
+        $shown = UpcomingQueue::trim($raw, $state['item']['id'] ?? null, $state['repeat_state'] ?? 'off', $contextIds, []);
+
+        $this->components->twoColumnDetail('AuxRoom would list as coming up', count($shown).' track(s)'.($contextIds === null ? ' (order unreadable, so only the loop is cut)' : ''));
+
+        foreach ($shown as $i => $track) {
+            $this->line(sprintf('  %2d. %s', $i + 1, $this->queueNames[$track['id']] ?? $track['id']));
+        }
+    }
+
     private function conclude(?array $state, array $queueIds, ?array $contextIds): void
     {
         $this->newLine();
@@ -333,6 +351,8 @@ class InspectSpotify extends Command
 
             return;
         }
+
+        $this->showWhatTheAppDisplays($state, $queueIds, $contextIds);
 
         if ($contextIds === null) {
             $this->line('  The context\'s order could not be read, so the wrap-around can only be judged from the queue itself (see the flagged lines above).');

@@ -101,4 +101,14 @@ interface SpotifyClientContract
      * @throws SpotifyRequestFailed
      */
     public function getPlaybackState(): ?array;
+
+    /**
+     * Track ids of a playlist or album in their real order, or null when
+     * Spotify won't say (an app in Development Mode only gets playlists its
+     * user owns), the context isn't a playlist/album, or it is too long to
+     * read in full (a few hundred tracks).
+     *
+     * @return array<int, string>|null
+     */
+    public function getContextTrackIds(string $contextUri): ?array;
 }

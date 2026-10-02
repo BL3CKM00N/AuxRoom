@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard\Concerns;
 
+use App\Models\Room;
 use App\Services\Spotify\SpotifyClientFactory;
 use Livewire\Attributes\Locked;
 
@@ -201,10 +202,11 @@ trait HandlesPlaylistSearch
     }
 
     /**
-     * Jumps straight to a specific track from the currently-playing
-     * playlist, the same as clicking a song inside a playlist in Spotify
-     * itself: it plays immediately, and the playlist's own native order
-     * (and auto-advance) resumes normally from there afterward.
+     * Jumps straight to a specific track from the playlist (or album) that is
+     * playing, the same as clicking a song inside it in Spotify itself: it
+     * plays immediately, and the playlist's own order (and auto-advance)
+     * carries on from there. The context is what Spotify reports it is
+     * playing, so this works however the playlist was started.
      */
     public function playFromPlaylist(string $trackId): void
     {
@@ -212,30 +214,39 @@ trait HandlesPlaylistSearch
             return;
         }
 
-        if (! $this->room->fallback_playlist_uri) {
+        $context = $this->room->now_playing_context_uri ?? $this->room->fallback_playlist_uri;
+
+        if (! Room::isPlayableContext($context)) {
+            $this->controlError = "That track isn't part of a playlist or album Spotify is playing, so it can't be jumped to.";
+
             return;
         }
 
-        // Looked up from Spotify's own live queue rather than trusted from
-        // the client, the same way every other track action in this class
-        // treats Spotify's queue as the only source of truth for content.
-        $track = $this->queue->firstWhere('spotify_track_id', $trackId);
+        // Looked up from the list shown rather than trusted from the client,
+        // the same way every other track action in this class treats
+        // Spotify's queue as the only source of truth for content.
+        $track = $this->queue->where('is_queued', false)->firstWhere('spotify_track_id', $trackId);
 
         if (! $track) {
+            $this->controlError = "That track isn't coming up any more. The list has been refreshed.";
+
             return;
         }
 
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
-        if (! $client->playContextAtTrack($this->room->fallback_playlist_uri, 'spotify:track:'.$trackId, 0, $this->providerDeviceId())) {
+        if (! $client->playContextAtTrack($context, 'spotify:track:'.$trackId, 0, $this->providerDeviceId())) {
             $this->controlError = "Spotify couldn't play that track. Try reselecting the device in Host Hub.";
 
             return;
         }
 
+        $this->controlError = '';
+
         $this->room->update([
             'now_playing_queue_item_id' => null,
             'now_playing_track_id' => $trackId,
+            'now_playing_context_uri' => $context,
             'now_playing_name' => $track->name,
             'now_playing_artist' => $track->artist,
             'now_playing_album_art_url' => $track->album_art_url,
@@ -243,7 +254,7 @@ trait HandlesPlaylistSearch
             'now_playing_started_at' => now(),
             'now_playing_position_ms' => 0,
             'is_playing' => true,
-            'is_playing_fallback' => true,
+            'is_playing_fallback' => $context === $this->room->fallback_playlist_uri,
             'last_local_command_at' => now(),
         ]);
 

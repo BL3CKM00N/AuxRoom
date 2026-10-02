@@ -29,6 +29,14 @@ class SpotifyWebApiClient implements SpotifyClientContract
     // sooner than commands, which are a deliberate action worth waiting for.
     private const READ_TIMEOUT_SECONDS = 5;
 
+    // A playlist's order changes rarely, so it is read once and kept; one that
+    // couldn't be read is retried sooner, but not on every render.
+    private const CONTEXT_TTL_SECONDS = 600;
+
+    private const CONTEXT_UNREADABLE_TTL_SECONDS = 120;
+
+    private const CONTEXT_MAX_TRACKS = 600;
+
     private const COMMAND_TIMEOUT_SECONDS = 10;
 
     public function __construct(private SpotifyAccount $account) {}
@@ -332,6 +340,69 @@ class SpotifyWebApiClient implements SpotifyClientContract
         Cache::put($key, $queue, self::QUEUE_TTL_SECONDS);
 
         return $queue;
+    }
+
+    public function getContextTrackIds(string $contextUri): ?array
+    {
+        if (! preg_match('/^spotify:(playlist|album):([A-Za-z0-9]+)$/', $contextUri, $m)) {
+            return null;
+        }
+
+        [, $type, $id] = $m;
+        $key = $this->cacheKey("context:{$contextUri}");
+        $cached = Cache::get($key);
+
+        if (is_array($cached)) {
+            return $cached ?: null;
+        }
+
+        // Spotify renamed the playlist endpoint in Feb 2026; try the new path, then the old one.
+        $paths = $type === 'playlist' ? ["/playlists/{$id}/items", "/playlists/{$id}/tracks"] : ["/albums/{$id}/tracks"];
+
+        foreach ($paths as $path) {
+            $ids = $this->readContextPath('https://api.spotify.com/v1'.$path, $type);
+
+            if ($ids) {
+                Cache::put($key, $ids, self::CONTEXT_TTL_SECONDS);
+
+                return $ids;
+            }
+        }
+
+        // An empty array is the "couldn't read it" marker, so it isn't retried every render.
+        Cache::put($key, [], self::CONTEXT_UNREADABLE_TTL_SECONDS);
+
+        return null;
+    }
+
+    /** @return array<int, string> */
+    private function readContextPath(string $url, string $type): array
+    {
+        $ids = [];
+        $offset = 0;
+
+        do {
+            $response = $this->get($url, ['limit' => 50, 'offset' => $offset, 'market' => 'from_token']);
+
+            // A half-read list would give a wrong remainder, so it counts as unreadable.
+            if (! $response || $response->failed()) {
+                return [];
+            }
+
+            foreach ($response->json('items', []) as $row) {
+                // Playlists: items[].item (new) or items[].track (old). Albums: items[] are the tracks.
+                $track = $type === 'album' ? $row : ($row['item'] ?? $row['track'] ?? null);
+
+                if (is_array($track) && ! empty($track['id'])) {
+                    $ids[] = $track['id'];
+                }
+            }
+
+            $offset += 50;
+        } while ($response->json('next') && count($ids) < self::CONTEXT_MAX_TRACKS);
+
+        // Too long to read in full: the remainder can't be counted from it either.
+        return $response->json('next') ? [] : $ids;
     }
 
     public function getPlaybackState(): ?array

@@ -14,7 +14,7 @@ use App\Models\ActivityEvent;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
-use App\Services\Spotify\SpotifyClientFactory;
+use App\Services\Spotify\UpcomingQueue;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -187,33 +187,29 @@ class ShowRoom extends Component
      */
     public function getQueueProperty()
     {
-        if ($this->isMock || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
-            return collect();
+        $upcoming = collect(app(UpcomingQueue::class)->forRoom($this->room));
+
+        if ($upcoming->isEmpty()) {
+            return $upcoming;
         }
 
-        $upcoming = app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue();
+        // Who queued what, for attribution only. One lookup for the whole list.
+        $addedBy = $this->room->queueItems()
+            ->whereNull('played_at')
+            ->whereIn('spotify_track_id', $upcoming->pluck('id'))
+            ->with('addedBy')
+            ->get()
+            ->groupBy('spotify_track_id');
 
-        // With repeat-track on, Spotify's own queue is just the currently
-        // playing track cycling forever — its raw "queue" array reflects
-        // that literally, listing the same track dozens of times. Collapse
-        // to unique tracks so "Up Next" doesn't show one song repeated.
-        return collect($upcoming)->unique('id')->map(function (array $track) {
-            $queued = $this->room->queueItems()
-                ->where('spotify_track_id', $track['id'])
-                ->whereNull('played_at')
-                ->with('addedBy')
-                ->first();
-
-            return (object) [
-                'spotify_track_id' => $track['id'],
-                'name' => $track['name'],
-                'artist' => $track['artist'],
-                'album_art_url' => $track['album_art_url'],
-                'duration_ms' => $track['duration_ms'],
-                'added_by_name' => $queued?->addedBy?->display_name,
-                'is_queued' => $queued !== null,
-            ];
-        });
+        return $upcoming->map(fn (array $track) => (object) [
+            'spotify_track_id' => $track['id'],
+            'name' => $track['name'],
+            'artist' => $track['artist'],
+            'album_art_url' => $track['album_art_url'],
+            'duration_ms' => $track['duration_ms'],
+            'added_by_name' => $track['is_queued'] ? $addedBy->get($track['id'])?->first()?->addedBy?->display_name : null,
+            'is_queued' => $track['is_queued'],
+        ]);
     }
 
     /** The subset of "Up Next" that was actually queued by someone — not upcoming playlist tracks. */

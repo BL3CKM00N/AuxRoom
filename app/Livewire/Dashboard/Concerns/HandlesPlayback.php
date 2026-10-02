@@ -32,15 +32,17 @@ trait HandlesPlayback
         }
 
         if ($this->room->now_playing_track_id) {
-            // A track playing from the fallback playlist's context resumes
-            // via that same context (offset to this track, at this exact
-            // position) rather than a bare track URI — a bare URI replaces
-            // the context entirely, and once that track ends Spotify has
-            // nothing left to advance to, so every future resume just
-            // replays that same now-context-less track forever.
-            if ($this->room->is_playing_fallback && $this->room->fallback_playlist_uri) {
+            // A track playing from a playlist or album resumes via that same
+            // context (offset to this track, at this exact position) rather
+            // than a bare track URI: a bare URI replaces the context
+            // entirely, and once that track ends Spotify has nothing left to
+            // advance to, so every future resume just replays that same
+            // now-context-less track forever. The context is whatever Spotify
+            // reports, so this also holds for a playlist started in the Spotify
+            // app, and it is what restarts a playlist that has finished.
+            if ($context = $this->room->playableContextUri()) {
                 if (! app(SpotifyClientFactory::class)->forRoom($this->room)->resumeContext(
-                    $this->room->fallback_playlist_uri,
+                    $context,
                     'spotify:track:'.$this->room->now_playing_track_id,
                     $this->room->now_playing_position_ms,
                     $this->room->shuffle_enabled,

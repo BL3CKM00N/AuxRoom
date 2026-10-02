@@ -26,6 +26,7 @@ class Room extends Model
         'closed_at',
         'now_playing_queue_item_id',
         'now_playing_track_id',
+        'now_playing_context_uri',
         'now_playing_name',
         'now_playing_artist',
         'now_playing_album_art_url',
@@ -35,6 +36,7 @@ class Room extends Model
         'last_local_command_at',
         'is_playing',
         'playback_inactive_at',
+        'playlist_finished_at',
         'shuffle_enabled',
         'repeat_mode',
         'volume_percent',
@@ -55,6 +57,7 @@ class Room extends Model
             'last_local_command_at' => 'datetime',
             'is_playing' => 'boolean',
             'playback_inactive_at' => 'datetime',
+            'playlist_finished_at' => 'datetime',
         ];
     }
 
@@ -64,6 +67,10 @@ class Room extends Model
         // live state) also ends "inactive", without every writer having to
         // remember to clear it.
         static::saving(function (Room $room) {
+            if ($room->is_playing && $room->playlist_finished_at !== null) {
+                $room->playlist_finished_at = null;
+            }
+
             if ($room->is_playing && $room->playback_inactive_at !== null) {
                 $room->playback_inactive_at = null;
             }
@@ -155,7 +162,7 @@ class Room extends Model
         // Hidden while playback is inactive, even though the track is still
         // stored for resuming: showing it as "paused" when there's nothing
         // left to play on is what left a dead track on screen.
-        if (! $this->now_playing_track_id || $this->playbackInactive()) {
+        if (! $this->now_playing_track_id || $this->playbackInactive() || $this->playlistFinished()) {
             return null;
         }
 
@@ -176,10 +183,43 @@ class Room extends Model
         return $this->playback_inactive_at !== null && ! $this->is_playing;
     }
 
+    /**
+     * The playlist ran out with repeat off. Spotify parks on its first track,
+     * paused, and the room says "finished" instead of showing that track.
+     * The track and context stay stored so Play restarts the playlist.
+     */
+    public function playlistFinished(): bool
+    {
+        return $this->playlist_finished_at !== null && ! $this->is_playing;
+    }
+
+    /**
+     * The playlist or album to resume or jump inside, for the track that is
+     * current: Spotify's own live context, else the room's chosen playlist
+     * while that is what's playing. Null for a guest-queued track, which has
+     * no context to preserve, and for anything that isn't a playlist/album.
+     */
+    public function playableContextUri(): ?string
+    {
+        if ($this->now_playing_queue_item_id) {
+            return null;
+        }
+
+        $uri = $this->now_playing_context_uri
+            ?? ($this->is_playing_fallback ? $this->fallback_playlist_uri : null);
+
+        return self::isPlayableContext($uri) ? $uri : null;
+    }
+
+    public static function isPlayableContext(?string $uri): bool
+    {
+        return $uri !== null && preg_match('/^spotify:(playlist|album):[A-Za-z0-9]+$/', $uri) === 1;
+    }
+
     /** The fallback playlist counts as "playing" for display only while playback is live. */
     public function fallbackIsShown(): bool
     {
-        return $this->is_playing_fallback && ! $this->playbackInactive();
+        return $this->is_playing_fallback && ! $this->playbackInactive() && ! $this->playlistFinished();
     }
 
     /**

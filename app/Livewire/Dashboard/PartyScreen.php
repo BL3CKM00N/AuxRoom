@@ -5,7 +5,7 @@ namespace App\Livewire\Dashboard;
 use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\Room;
 use App\Services\Spotify\PlaybackSync;
-use App\Services\Spotify\SpotifyClientFactory;
+use App\Services\Spotify\UpcomingQueue;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -57,17 +57,10 @@ class PartyScreen extends Component
         return $this->room->activeMembers()->count();
     }
 
-    /** Spotify's own live queue — see ShowRoom::getQueueProperty() for why. */
+    /** The real upcoming tracks, with Spotify's wrap-around padding removed (see UpcomingQueue). */
     public function getUpNextProperty()
     {
-        if (app(SpotifyClientFactory::class)->isMock($this->room) || ! $this->room->playbackProvider?->hasSpotifyConnected()) {
-            return collect();
-        }
-
-        // Collapse to unique tracks — with repeat-track on, Spotify's raw
-        // queue is just the currently playing track listed many times over.
-        return collect(app(SpotifyClientFactory::class)->forRoom($this->room)->getQueue())
-            ->unique('id')
+        return collect(app(UpcomingQueue::class)->forRoom($this->room))
             ->take(4)
             ->map(fn (array $track) => (object) $track);
     }
