@@ -168,9 +168,10 @@
             @else
                 <span class="flex items-center text-aux-faint opacity-40"><x-icon name="device" class="w-4 h-4" /></span>
             @endif
-            <x-icon name="volume" class="w-4 h-4 {{ $this->canGuest('guests_can_set_volume') ? 'text-aux-muted' : 'text-aux-faint opacity-40' }}" />
-            <div x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume">
-                <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume'))
+            <x-icon name="volume" class="w-4 h-4 {{ $this->canGuest('guests_can_set_volume') && $room->volume_supported ? 'text-aux-muted' : 'text-aux-faint opacity-40' }}" />
+            <div x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume"
+                 @if (! $room->volume_supported) title="This device's volume can't be changed from here" @endif>
+                <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume') || ! $room->volume_supported)
                        :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%)`"
                        x-on:input="volume = $event.target.valueAsNumber"
                        wire:change="setVolume($event.target.value)" class="w-20 disabled:opacity-30">
@@ -205,10 +206,10 @@
 
                 <div class="px-3 pt-3 pb-1" x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume">
                     <div class="flex items-center justify-between text-[11px] text-aux-faint mb-2">
-                        <span class="uppercase tracking-wide">Volume</span>
+                        <span class="uppercase tracking-wide">Volume{{ $room->volume_supported ? '' : ' (not adjustable on this device)' }}</span>
                         <span x-text="volume"></span>
                     </div>
-                    <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume'))
+                    <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume') || ! $room->volume_supported)
                            :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%); background-clip: content-box;`"
                            x-on:input="volume = $event.target.valueAsNumber"
                            wire:change="setVolume($event.target.value)" class="seek-bar w-full disabled:opacity-30">

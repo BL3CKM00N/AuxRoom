@@ -93,10 +93,13 @@ class PlaybackSync
         $shuffleChanged = $state['shuffle_enabled'] !== $room->shuffle_enabled
             || $state['smart_shuffle_enabled'] !== $room->smart_shuffle_enabled;
         $repeatChanged = $state['repeat_mode'] !== $room->repeat_mode;
+        // Volume changed on the device or in the Spotify app, not through AuxRoom.
+        $volumeChanged = ($state['volume_percent'] !== null && $state['volume_percent'] !== $room->volume_percent)
+            || $state['supports_volume'] !== $room->volume_supported;
         $contextChanged = $state['context_uri'] !== $room->now_playing_context_uri;
         $wasInactive = $room->playback_inactive_at !== null;
 
-        if (! $wasInactive && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
+        if (! $wasInactive && ! $volumeChanged && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
             return;
         }
 
@@ -114,6 +117,8 @@ class PlaybackSync
             'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
             'shuffle_enabled' => $state['shuffle_enabled'],
             'smart_shuffle_enabled' => $state['smart_shuffle_enabled'],
+            'volume_percent' => $state['volume_percent'] ?? $room->volume_percent,
+            'volume_supported' => $state['supports_volume'],
             'repeat_mode' => $state['repeat_mode'],
             'playback_inactive_at' => null,
             'playlist_finished_at' => $this->finishedAt($room, $state, $trackChanged, $finished),

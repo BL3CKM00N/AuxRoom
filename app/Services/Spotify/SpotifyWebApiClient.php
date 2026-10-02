@@ -443,6 +443,11 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'shuffle_enabled' => (bool) ($json['shuffle_state'] ?? false),
             // Not in Spotify's docs, but present in the player state (true only alongside shuffle_state).
             'smart_shuffle_enabled' => (bool) ($json['smart_shuffle'] ?? false),
+            // False when the device can't be volume-controlled (some phones and speakers); its volume number then means nothing.
+            'supports_volume' => (bool) ($json['device']['supports_volume'] ?? true),
+            'volume_percent' => ($json['device']['supports_volume'] ?? true) && isset($json['device']['volume_percent'])
+                ? (int) $json['device']['volume_percent']
+                : null,
             'repeat_mode' => $json['repeat_state'] ?? 'off',
         ];
     }

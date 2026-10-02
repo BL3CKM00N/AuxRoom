@@ -244,6 +244,12 @@ trait HandlesPlayback
             return;
         }
 
+        if (! $this->room->volume_supported) {
+            $this->controlError = "This device's volume can't be changed from here. Use the device itself.";
+
+            return;
+        }
+
         $percent = max(0, min(100, $percent));
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent, $this->providerDeviceId())) {
@@ -252,7 +258,8 @@ trait HandlesPlayback
             return;
         }
 
-        $this->room->update(['volume_percent' => $percent]);
+        // The grace window keeps a poll that still reads the old volume (Spotify lags behind a write) from undoing this.
+        $this->room->update(['volume_percent' => $percent, 'last_local_command_at' => now()]);
         $this->broadcastUpdate('playback');
     }
 

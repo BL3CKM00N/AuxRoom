@@ -41,6 +41,7 @@ class Room extends Model
         'smart_shuffle_enabled',
         'repeat_mode',
         'volume_percent',
+        'volume_supported',
     ];
 
     protected function casts(): array
@@ -51,6 +52,7 @@ class Room extends Model
             'is_playing_fallback' => 'boolean',
             'shuffle_enabled' => 'boolean',
             'smart_shuffle_enabled' => 'boolean',
+            'volume_supported' => 'boolean',
             'location_enforced' => 'boolean',
             'location_lat' => 'float',
             'location_lng' => 'float',
