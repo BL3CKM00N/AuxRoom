@@ -19,8 +19,11 @@
             // The playlist ran out with repeat off (Spotify parks on its first
             // track, which isn't shown as current). Device problems take priority.
             $playlistFinished = ! $spotifyDisconnected && ! $noDeviceAvailable && $room->playlistFinished();
+            // Mobile: the device and volume panel is closed until the speaker icon is tapped, so
+            // the one case where that could cost the host a step (no device to play on) gets a dot.
+            $deviceHint = $this->isHost && ! $this->isMock && empty($this->devices);
         @endphp
-        <div class="order-1 p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border">
+        <div class="order-1 p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border" x-data="{ tools: false }">
             <div class="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
                 <div class="w-36 h-36 sm:w-28 sm:h-28 rounded-lg bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
                     @if ($this->nowPlaying?->album_art_url)
@@ -95,26 +98,42 @@
                                     <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black text-[8px] font-bold flex items-center justify-center">1</span>
                                 @endif
                             </button>
+                            <button type="button" @click="tools = !tools" class="md:hidden relative text-aux-muted hover:text-aux-text" :class="tools ? '!text-aux-accent' : ''" aria-label="Device and volume" :aria-expanded="tools">
+                                <x-icon name="volume" class="w-4 h-4" />
+                                @if ($deviceHint)
+                                    <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" title="No playback device found"></span>
+                                @endif
+                            </button>
                         </div>
                     @else
                         <button wire:click="play" @disabled(($this->queue->isEmpty() && ! $room->fallback_playlist_uri && ! $room->now_playing_track_id) || ! $this->canGuest('guests_can_play_pause'))
                                 class="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
                             <x-icon name="play" class="w-3.5 h-3.5" /> Play
                         </button>
+                        <div class="mt-3 ml-3 inline-flex align-middle">
+                            <button type="button" @click="tools = !tools" class="md:hidden relative text-aux-muted hover:text-aux-text" :class="tools ? '!text-aux-accent' : ''" aria-label="Device and volume" :aria-expanded="tools">
+                                <x-icon name="volume" class="w-4 h-4" />
+                                @if ($deviceHint)
+                                    <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" title="No playback device found"></span>
+                                @endif
+                            </button>
+                        </div>
                     @endif
                 </div>
             </div>
 
             {{-- Mobile only: what the bottom player bar used to keep behind its volume
                  button (device and volume). That bar is hidden below md now, so they
-                 live here, in the card, and show even when nothing is playing, since a
-                 host picks the device before anything plays. --}}
+                 live here, closed until the speaker icon in the controls (or next to
+                 Play when nothing is playing, since a host picks the device first) is
+                 tapped. The open state is Alpine's `tools` on the card, so the page's
+                 regular refreshes never collapse it. --}}
             @php
                 $activeDeviceId = $room->playbackProvider?->spotifyAccount?->active_device_id;
                 $activeDeviceName = collect($this->devices)->firstWhere('id', $activeDeviceId)['name']
                     ?? $room->playbackProvider?->spotifyAccount?->active_device_name;
             @endphp
-            <div class="md:hidden mt-5 pt-4 border-t border-aux-border space-y-4">
+            <div x-show="tools" x-cloak x-collapse class="md:hidden mt-5 pt-4 border-t border-aux-border space-y-4">
                 @if ($this->isHost)
                     <div x-data="{ open: false }">
                         <button type="button" @click="open = !open" class="w-full flex items-center gap-3 text-left">
@@ -127,7 +146,7 @@
                         </button>
                         <div x-show="open" x-cloak class="mt-2 rounded-lg bg-aux-card-hover border border-aux-border p-1">
                             @forelse ($this->devices as $device)
-                                <button type="button" wire:click="selectDevice({{ \Illuminate\Support\Js::from($device['id']) }}, {{ \Illuminate\Support\Js::from($device['name']) }})" @click="open = false"
+                                <button type="button" wire:click="selectDevice({{ \Illuminate\Support\Js::from($device['id']) }}, {{ \Illuminate\Support\Js::from($device['name']) }})" @click="open = false; tools = false"
                                         class="w-full text-left px-3 py-3 rounded-md text-sm {{ $activeDeviceId === $device['id'] ? 'bg-aux-accent-soft text-aux-accent' : 'hover:bg-white/5' }}">
                                     {{ $device['name'] }}
                                 </button>

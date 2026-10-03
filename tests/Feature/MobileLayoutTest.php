@@ -98,4 +98,50 @@ class MobileLayoutTest extends TestCase
             $this->assertStringContainsString($n === 1 ? 'Playing on' : $text, $card, "order-{$n} is the {$text} card");
         }
     }
+
+    public function test_the_device_and_volume_panel_starts_closed_and_a_speaker_icon_opens_it(): void
+    {
+        $html = $this->html(['now_playing_track_id' => 't1', 'now_playing_name' => 'Alpha Anthem', 'now_playing_duration_ms' => 180000, 'is_playing' => true, 'now_playing_started_at' => now()]);
+
+        $this->assertStringContainsString('x-data="{ tools: false }"', $html, 'closed on load');
+        $this->assertMatchesRegularExpression('/<div x-show="tools" x-cloak x-collapse class="md:hidden mt-5/', $html, 'the panel is hidden until tools is true');
+        $this->assertStringContainsString('@click="tools = !tools"', $html);
+        $this->assertStringContainsString('aria-label="Device and volume"', $html);
+    }
+
+    public function test_the_speaker_icon_is_there_when_nothing_is_playing_too(): void
+    {
+        $html = $this->html(['now_playing_track_id' => null, 'is_playing' => false]);
+
+        $this->assertStringContainsString('@click="tools = !tools"', $html, 'a host picks the device before anything plays');
+    }
+
+    public function test_choosing_a_device_closes_the_panel(): void
+    {
+        $html = $this->html();
+
+        $this->assertMatchesRegularExpression('/wire:click="selectDevice\([^"]*"[^>]*@click="open = false; tools = false"/', $html);
+    }
+
+    public function test_the_host_gets_a_dot_on_the_icon_only_when_no_playback_device_is_found(): void
+    {
+        $this->assertStringNotContainsString('No playback device found', $this->html(), 'a device is listed');
+
+        $host = User::factory()->create();
+        SpotifyAccount::create([
+            'user_id' => $host->id, 'client_id' => 'id', 'client_secret' => 'secret',
+            'access_token' => 'token', 'refresh_token' => 'refresh', 'token_expires_at' => now()->addHour(),
+        ]);
+        $room = Room::create(['invite_code' => 'DDDDDD-EEEEEE-FFFFFF', 'host_id' => $host->id, 'playback_provider_id' => $host->id])->refresh();
+        app(RoomMembership::class)->joinAsHost($room);
+        // Stubs registered first win, so replace the earlier fake.
+        Http::swap(new \Illuminate\Http\Client\Factory);
+        Http::fake([
+            'api.spotify.com/v1/me/player/queue' => Http::response(['queue' => []]),
+            'api.spotify.com/v1/me/player/devices' => Http::response(['devices' => []]),
+            'api.spotify.com/v1/me/player' => Http::response('', 204),
+        ]);
+
+        $this->assertStringContainsString('No playback device found', Livewire::actingAs($host)->test(ShowRoom::class, ['room' => $room])->html());
+    }
 }
