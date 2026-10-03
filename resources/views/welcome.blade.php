@@ -61,7 +61,7 @@
                         </p>
 
                         <div class="mt-8 flex flex-wrap justify-center lg:justify-start gap-3">
-                            <a href="{{ route('register') }}" wire:navigate
+                            <a href="{{ route('login') }}" wire:navigate
                                class="inline-flex items-center px-5 py-2.5 bg-aux-accent text-black rounded-full font-semibold hover:bg-aux-accent-strong">
                                 Host a room
                             </a>

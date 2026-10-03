@@ -16,7 +16,8 @@ class MobileLayoutTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function html(array $roomAttributes = []): string
+    /** @param array<int, array>|null $devices what Spotify lists as devices; null means one phone */
+    private function html(array $roomAttributes = [], ?array $devices = null): string
     {
         $host = User::factory()->create();
         SpotifyAccount::create([
@@ -28,7 +29,7 @@ class MobileLayoutTest extends TestCase
 
         Http::fake([
             'api.spotify.com/v1/me/player/queue' => Http::response(['queue' => []]),
-            'api.spotify.com/v1/me/player/devices' => Http::response(['devices' => [
+            'api.spotify.com/v1/me/player/devices' => Http::response(['devices' => $devices ?? [
                 ['id' => 'dev1', 'name' => "Daan's iPhone", 'type' => 'Smartphone', 'is_active' => true, 'supports_volume' => true],
             ]]),
             'api.spotify.com/v1/me/player' => Http::response('', 204),
@@ -123,25 +124,110 @@ class MobileLayoutTest extends TestCase
         $this->assertMatchesRegularExpression('/wire:click="selectDevice\([^"]*"[^>]*@click="open = false; tools = false"/', $html);
     }
 
-    public function test_the_host_gets_a_dot_on_the_icon_only_when_no_playback_device_is_found(): void
+    public function test_with_no_device_at_all_every_playback_and_queue_control_is_hidden(): void
     {
-        $this->assertStringNotContainsString('No playback device found', $this->html(), 'a device is listed');
+        $html = $this->html(['now_playing_track_id' => null, 'is_playing' => false], devices: []);
+        $card = $this->card($html);
 
-        $host = User::factory()->create();
-        SpotifyAccount::create([
-            'user_id' => $host->id, 'client_id' => 'id', 'client_secret' => 'secret',
-            'access_token' => 'token', 'refresh_token' => 'refresh', 'token_expires_at' => now()->addHour(),
-        ]);
-        $room = Room::create(['invite_code' => 'DDDDDD-EEEEEE-FFFFFF', 'host_id' => $host->id, 'playback_provider_id' => $host->id])->refresh();
-        app(RoomMembership::class)->joinAsHost($room);
-        // Stubs registered first win, so replace the earlier fake.
-        Http::swap(new \Illuminate\Http\Client\Factory);
-        Http::fake([
-            'api.spotify.com/v1/me/player/queue' => Http::response(['queue' => []]),
-            'api.spotify.com/v1/me/player/devices' => Http::response(['devices' => []]),
-            'api.spotify.com/v1/me/player' => Http::response('', 204),
-        ]);
+        $this->assertStringContainsString('No device found', $card);
+        $this->assertStringContainsString('Open Spotify on a phone, computer, or speaker', $card);
 
-        $this->assertStringContainsString('No playback device found', Livewire::actingAs($host)->test(ShowRoom::class, ['room' => $room])->html());
+        foreach (['play', 'pause', 'previous', 'skip', 'toggleShuffle', 'toggleRepeat', 'setVolume', 'openPlaylistPicker'] as $action) {
+            $this->assertStringNotContainsString('wire:click="'.$action, $card, "{$action} cannot do anything without a device");
+        }
+        $this->assertStringNotContainsString('aria-label="Device and volume"', $card);
+        $this->assertStringNotContainsString('x-collapse', $card, 'no device and volume panel either');
+
+        $page = substr($html, 0, strpos($html, 'Emergency stop'));
+        $this->assertStringNotContainsString('Find Music', $page);
+        $this->assertStringNotContainsString('Choose a playlist', $page);
+        $this->assertStringNotContainsString('Up Next', $page);
+        $this->assertStringContainsString('Emergency stop', $html, 'the host keeps the safety control');
+    }
+
+    public function test_a_failed_device_lookup_while_a_song_plays_does_not_hide_the_controls(): void
+    {
+        $html = $this->html(
+            ['now_playing_track_id' => 't1', 'now_playing_name' => 'Alpha Anthem', 'now_playing_duration_ms' => 180000, 'is_playing' => true, 'now_playing_started_at' => now()],
+            devices: [],
+        );
+
+        $card = $this->card($html);
+        $this->assertStringContainsString('wire:click="pause"', $card);
+        $this->assertStringContainsString('wire:click="previous"', $card);
+        $this->assertStringContainsString('Find Music', $html);
+    }
+
+    public function test_with_a_device_listed_but_idle_search_and_the_playlist_picker_stay_but_the_queue_list_goes(): void
+    {
+        $html = $this->html([
+            'now_playing_track_id' => 't1', 'now_playing_name' => 'Alpha Anthem', 'now_playing_duration_ms' => 180000,
+            'is_playing' => false, 'playback_inactive_at' => now(),
+        ]);
+        $page = substr($html, 0, strpos($html, 'Emergency stop'));
+
+        $this->assertStringContainsString('Find Music', $page, 'adding a song can wake the device');
+        $this->assertStringContainsString('Choose a playlist', $page);
+        $this->assertStringNotContainsString('Up Next', $page, 'nothing is queued on an inactive player');
+    }
+
+    /** The attribute list of the first button that calls $action. */
+    private function button(string $html, string $action): string
+    {
+        $this->assertSame(1, preg_match('/<button[^>]*wire:click="'.$action.'"[^>]*>/s', $html, $m), "a {$action} button is rendered");
+
+        return $m[0];
+    }
+
+    private function isDisabled(string $button): bool
+    {
+        return preg_match('/\sdisabled[\s=>]/', $button) === 1;
+    }
+
+    /** Only the Now Playing card: the desktop bar further down the page has its own copies of these buttons. */
+    private function card(string $html): string
+    {
+        // The card ends where the next card begins; which cards exist depends on the state.
+        $ends = array_filter(array_map(fn (string $marker) => strpos($html, $marker), ['Find Music', 'Up Next', 'Emergency stop']), fn ($p) => $p !== false);
+        $this->assertNotEmpty($ends);
+
+        return substr($html, 0, min($ends));
+    }
+
+    public function test_with_a_device_listed_but_idle_only_play_and_the_device_button_are_offered_in_the_card(): void
+    {
+        // Spotify reported nothing active: the track is kept for resuming but not shown (see Room::playbackInactive()).
+        $card = $this->card($this->html([
+            'now_playing_track_id' => 't1', 'now_playing_name' => 'Alpha Anthem', 'now_playing_duration_ms' => 180000,
+            'is_playing' => false, 'playback_inactive_at' => now(),
+        ]));
+
+        // A device is listed but nothing is active: not "no device", since pressing Play can wake it.
+        $this->assertStringContainsString('Not playing', $card);
+        $this->assertStringNotContainsString('No device found', $card);
+
+        foreach (['previous', 'skip', 'toggleShuffle', 'toggleRepeat'] as $action) {
+            $this->assertStringNotContainsString('wire:click="'.$action.'"', $card, "{$action} has nothing to act on without a device");
+        }
+
+        $this->assertFalse($this->isDisabled($this->button($card, 'play')), 'the retained track can still be resumed');
+        $this->assertStringContainsString('aria-label="Device and volume"', $card, 'the host still needs to pick a device');
+    }
+
+    public function test_with_nothing_to_play_the_controls_are_there_and_play_is_disabled(): void
+    {
+        $html = $this->card($this->html(['now_playing_track_id' => null, 'is_playing' => false]));
+
+        $this->assertTrue($this->isDisabled($this->button($html, 'previous')));
+        $this->assertTrue($this->isDisabled($this->button($html, 'skip')));
+        $this->assertTrue($this->isDisabled($this->button($html, 'play')), 'nothing queued, no playlist, no stored track');
+    }
+
+    public function test_while_playing_previous_and_next_are_enabled(): void
+    {
+        $html = $this->card($this->html(['now_playing_track_id' => 't1', 'now_playing_name' => 'Alpha Anthem', 'now_playing_duration_ms' => 180000, 'is_playing' => true, 'now_playing_started_at' => now()]));
+
+        $this->assertFalse($this->isDisabled($this->button($html, 'previous')));
+        $this->assertFalse($this->isDisabled($this->button($html, 'skip')));
     }
 }

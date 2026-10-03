@@ -29,6 +29,13 @@ class HomeRedirectTest extends TestCase
         $this->get('/')->assertOk()->assertSee('Host a room')->assertSee('Log in');
     }
 
+    public function test_the_host_a_room_button_goes_to_login(): void
+    {
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('#<a href="'.preg_quote(route('login'), '#').'"[^>]*>\s*Host a room\s*</a>#', $html);
+    }
+
     public function test_logged_in_without_a_room_goes_straight_to_room_creation(): void
     {
         $this->actingAs(User::factory()->create())

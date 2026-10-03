@@ -19,9 +19,15 @@
             // The playlist ran out with repeat off (Spotify parks on its first
             // track, which isn't shown as current). Device problems take priority.
             $playlistFinished = ! $spotifyDisconnected && ! $noDeviceAvailable && $room->playlistFinished();
-            // Mobile: the device and volume panel is closed until the speaker icon is tapped, so
-            // the one case where that could cost the host a step (no device to play on) gets a dot.
-            $deviceHint = $this->isHost && ! $this->isMock && empty($this->devices);
+            // A: no playback device exists at all (or Spotify is disconnected). Nothing can start,
+            // so every playback and queue control is hidden. The list is only trusted while
+            // nothing is playing, so a failed device lookup mid-song cannot hide the controls.
+            $deviceListed = ! empty($this->devices);
+            $playbackUnavailable = $spotifyDisconnected
+                || (! $this->isMock && ! $deviceListed && ! ($this->nowPlaying || $room->fallbackIsShown()));
+            // B: a device is listed but nothing is active. Play, search and the playlist picker can
+            // still wake it, but there is no shuffle/skip/repeat to offer and no queue to show.
+            $hideQueue = $spotifyDisconnected || $noDeviceAvailable;
         @endphp
         <div class="order-1 p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border" x-data="{ tools: false }">
             <div class="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
@@ -34,7 +40,7 @@
                 </div>
                 <div class="w-full min-w-0 sm:flex-1">
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-aux-accent">
-                        <x-icon name="note" class="w-3.5 h-3.5" /> {{ $spotifyDisconnected ? 'Spotify disconnected' : ($noDeviceAvailable ? 'No device found' : ($playlistFinished ? 'Playlist finished' : ($room->is_playing ? 'Now spinning' : 'On pause'))) }}
+                        <x-icon name="note" class="w-3.5 h-3.5" /> {{ $spotifyDisconnected ? 'Spotify disconnected' : ($noDeviceAvailable ? ($deviceListed ? 'Not playing' : 'No device found') : ($playlistFinished ? 'Playlist finished' : ($room->is_playing ? 'Now spinning' : 'On pause'))) }}
                     </span>
                     @if ($room->smartShuffleOn() && ! $spotifyDisconnected && ! $noDeviceAvailable)
                         <span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-aux-accent-soft text-aux-accent text-[10px] font-semibold align-middle" title="Spotify shuffles the playlist and mixes in recommended songs">
@@ -42,9 +48,18 @@
                         </span>
                     @endif
                     <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($playlistFinished ? 'End of the playlist' : ($room->fallbackIsShown() ? $room->fallback_playlist_name : ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($noDeviceAvailable ? 'Nothing\'s playing anywhere' : 'Nothing queued yet')))) }}</h2>
-                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($playlistFinished ? 'Press play to start it again.' : ($room->fallbackIsShown() ? 'Playlist · shuffled' : ($spotifyDisconnected ? ($this->isHost ? 'Reconnect it in Room Settings.' : 'The host needs to reconnect Spotify.') : ($noDeviceAvailable ? 'Open Spotify on a phone, computer, or speaker, then come back here.' : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track'))))) }}</p>
+                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($playlistFinished ? 'Press play to start it again.' : ($room->fallbackIsShown() ? 'Playlist · shuffled' : ($spotifyDisconnected ? ($this->isHost ? 'Reconnect it in Room Settings.' : 'The host needs to reconnect Spotify.') : ($noDeviceAvailable ? ($deviceListed ? 'Press play to resume, or start something in Spotify.' : 'Open Spotify on a phone, computer, or speaker, then come back here.') : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track'))))) }}</p>
 
-                    @if ($this->nowPlaying || $room->fallbackIsShown())
+                    @php
+                        // The transport controls are always shown (greyed out when there is
+                        // nothing to act on), as the bottom bar's were. Below md that bar is
+                        // gone, so without this previous/next vanished in "No device found".
+                        $controlsActive = $this->nowPlaying || $room->fallbackIsShown();
+                        // With no device (or Spotify disconnected) there is nothing to shuffle, skip
+                        // or repeat, so only Play (to resume) and the device button are offered.
+                        $showTransport = ! $spotifyDisconnected && ! $noDeviceAvailable;
+                    @endphp
+                    @if ($controlsActive)
                         <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint"
                              x-data="playbackClock()"
                              x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
@@ -59,11 +74,14 @@
                                    @disabled(! $this->canGuest('guests_can_seek')) class="seek-bar flex-1 disabled:opacity-30">
                             <span x-text="formatMs(durationMs)"></span>
                         </div>
+                    @endif
 
-                        <div class="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:justify-start">
+                    @unless ($playbackUnavailable)
+                    <div class="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:justify-start">
                             @if ($this->isMock)
                                 <span class="hidden sm:inline px-2.5 py-1 rounded-full bg-white/5 text-[10px] font-semibold text-aux-muted">SAMPLE TRACK</span>
                             @endif
+                            @if ($showTransport)
                             <button wire:click="toggleShuffle" @disabled(! $this->canGuest('guests_can_play_pause'))
                                     class="relative disabled:opacity-30 disabled:cursor-not-allowed {{ $room->shuffle_enabled ? 'text-aux-accent' : 'text-aux-muted hover:text-aux-text' }}">
                                 <x-icon name="shuffle" class="w-4 h-4" />
@@ -71,23 +89,27 @@
                                     <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black flex items-center justify-center" title="Smart Shuffle"><x-icon name="zap" class="w-2 h-2" /></span>
                                 @endif
                             </button>
+                            @endif
+                            @if ($showTransport)
                             {{-- Text labels match the bottom bar's icon-only convention below sm --}}
-                            <button wire:click="previous" @disabled(! $this->canGuest('guests_can_skip'))
+                            <button wire:click="previous" @disabled(! $controlsActive || ! $this->canGuest('guests_can_skip'))
                                     class="inline-flex items-center gap-1 text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
                                 <x-icon name="back" class="w-4 h-4" /> <span class="hidden sm:inline">Previous</span>
                             </button>
+                            @endif
                             @if ($room->is_playing)
                                 <button wire:click="pause" @disabled(! $this->canGuest('guests_can_play_pause'))
                                         class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
                                     <x-icon name="pause" class="w-3.5 h-3.5" /> Pause
                                 </button>
                             @else
-                                <button wire:click="play" @disabled(! $this->canGuest('guests_can_play_pause'))
+                                <button wire:click="play" @disabled(! $this->canGuest('guests_can_play_pause') || (! $controlsActive && $this->queue->isEmpty() && ! $room->fallback_playlist_uri && ! $room->now_playing_track_id))
                                         class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
                                     <x-icon name="play" class="w-3.5 h-3.5" /> Play
                                 </button>
                             @endif
-                            <button wire:click="skip" @disabled(! $this->canGuest('guests_can_skip'))
+                            @if ($showTransport)
+                            <button wire:click="skip" @disabled(! $controlsActive || ! $this->canGuest('guests_can_skip'))
                                     class="inline-flex items-center gap-1 text-aux-muted hover:text-aux-text disabled:opacity-30 disabled:cursor-not-allowed">
                                 <x-icon name="skip" class="w-4 h-4" /> <span class="hidden sm:inline">Skip track</span>
                             </button>
@@ -98,27 +120,12 @@
                                     <span class="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-aux-accent text-black text-[8px] font-bold flex items-center justify-center">1</span>
                                 @endif
                             </button>
+                            @endif
                             <button type="button" @click="tools = !tools" class="md:hidden relative text-aux-muted hover:text-aux-text" :class="tools ? '!text-aux-accent' : ''" aria-label="Device and volume" :aria-expanded="tools">
                                 <x-icon name="volume" class="w-4 h-4" />
-                                @if ($deviceHint)
-                                    <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" title="No playback device found"></span>
-                                @endif
                             </button>
-                        </div>
-                    @else
-                        <button wire:click="play" @disabled(($this->queue->isEmpty() && ! $room->fallback_playlist_uri && ! $room->now_playing_track_id) || ! $this->canGuest('guests_can_play_pause'))
-                                class="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-aux-accent text-black text-sm font-semibold disabled:opacity-30 disabled:cursor-not-allowed">
-                            <x-icon name="play" class="w-3.5 h-3.5" /> Play
-                        </button>
-                        <div class="mt-3 ml-3 inline-flex align-middle">
-                            <button type="button" @click="tools = !tools" class="md:hidden relative text-aux-muted hover:text-aux-text" :class="tools ? '!text-aux-accent' : ''" aria-label="Device and volume" :aria-expanded="tools">
-                                <x-icon name="volume" class="w-4 h-4" />
-                                @if ($deviceHint)
-                                    <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" title="No playback device found"></span>
-                                @endif
-                            </button>
-                        </div>
-                    @endif
+                    </div>
+                    @endunless
                 </div>
             </div>
 
@@ -133,6 +140,7 @@
                 $activeDeviceName = collect($this->devices)->firstWhere('id', $activeDeviceId)['name']
                     ?? $room->playbackProvider?->spotifyAccount?->active_device_name;
             @endphp
+            @unless ($playbackUnavailable)
             <div x-show="tools" x-cloak x-collapse class="md:hidden mt-5 pt-4 border-t border-aux-border space-y-4">
                 @if ($this->isHost)
                     <div x-data="{ open: false }">
@@ -169,9 +177,11 @@
                            wire:change="setVolume($event.target.value)" class="seek-bar w-full disabled:opacity-30">
                 </div>
             </div>
+            @endunless
         </div>
 
         {{-- Up next --}}
+        @unless ($hideQueue)
         @php
             $queuedItems = $this->queue->where('is_queued', true)->values();
             $playlistItems = $this->queue->where('is_queued', false)->values();
@@ -257,10 +267,13 @@
                 </p>
             @endif
         </div>
+        @endunless
     </div>
 
     <div class="contents lg:block lg:space-y-6">
 
+        {{-- Find music and Playlist: nothing to search or play on without a device --}}
+        @unless ($playbackUnavailable)
         {{-- Find music --}}
         @php
             $outOfRange = ! $this->isHost && $room->location_enforced && ! $this->member->passesLocationCheck();
@@ -363,6 +376,8 @@
                 </button>
             </div>
         @endif
+
+        @endunless
 
         {{-- Emergency stop: locks queue additions instantly --}}
         @if ($this->isHost)

@@ -64,7 +64,8 @@ class InactivePlaybackDisplayTest extends TestCase
 
         Livewire::actingAs($room->host)
             ->test(ShowRoom::class, ['room' => $room])
-            ->assertSee('No device found')
+            // The fixture lists a device that is not active, so it is "not playing", not "no device".
+            ->assertSee('Not playing')
             ->assertSee("Nothing's playing anywhere")
             ->assertDontSee('Zyxwv Dead Track')
             ->assertDontSee('Gone Artist')
