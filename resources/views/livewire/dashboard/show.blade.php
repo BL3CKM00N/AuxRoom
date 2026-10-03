@@ -1,4 +1,4 @@
-<div wire:poll.3s="heartbeat" x-data="roomLocation('{{ route('join', ['code' => $room->invite_code]) }}')" x-init="init()" class="flex-1 flex flex-col bg-aux-bg text-aux-text">
+<div wire:poll.3s="heartbeat" x-on:app-resumed.window="$wire.heartbeat()" x-data="roomLocation('{{ route('join', ['code' => $room->invite_code]) }}')" x-init="init()" class="flex-1 flex flex-col bg-aux-bg text-aux-text">
 
 @if (! $this->isApproved)
 
@@ -66,7 +66,7 @@
         @endif
 
         {{-- Scrollable content --}}
-        <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-32">
+        <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-8 md:pb-32">
 
             @if ($activeTab === 'hub' && $this->isHost)
                 @include('livewire.dashboard.tabs.hub')
@@ -80,7 +80,7 @@
     </div>
 
     {{-- Bottom player bar --}}
-    <div class="fixed bottom-0 inset-x-0 bg-aux-sidebar border-t border-aux-border px-4 sm:px-6 py-3 flex items-center gap-4 z-20">
+    <div class="fixed bottom-0 inset-x-0 bg-aux-sidebar border-t border-aux-border px-4 sm:px-6 py-3 hidden md:flex items-center gap-4 z-20">
         <div class="flex items-center gap-3 shrink-0 min-w-0 sm:w-48">
             <div class="w-11 h-11 rounded-md bg-aux-card flex items-center justify-center shrink-0 overflow-hidden">
                 @if ($this->nowPlaying?->album_art_url)
@@ -156,7 +156,7 @@
                     <div x-show="open" x-cloak @click.outside="open = false"
                          class="absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-aux-card-hover border border-aux-border shadow-xl p-1 z-30">
                         @forelse ($this->devices as $device)
-                            <button wire:click="selectDevice('{{ $device['id'] }}', '{{ $device['name'] }}')"
+                            <button wire:click="selectDevice({{ \Illuminate\Support\Js::from($device['id']) }}, {{ \Illuminate\Support\Js::from($device['name']) }})"
                                     class="w-full text-left text-xs px-3 py-2 rounded-md {{ ($room->playbackProvider?->spotifyAccount?->active_device_id ?? null) === $device['id'] ? 'bg-aux-accent-soft text-aux-accent' : 'hover:bg-white/5' }}">
                                 {{ $device['name'] }}
                             </button>
@@ -175,45 +175,6 @@
                        :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%)`"
                        x-on:input="volume = $event.target.valueAsNumber"
                        wire:change="setVolume($event.target.value)" class="w-20 disabled:opacity-30">
-            </div>
-        </div>
-
-        {{-- Mobile: same controls (queue shortcut, device, volume) tucked
-             behind one touch-sized button instead of competing for space
-             in the bar itself. --}}
-        <div class="md:hidden relative shrink-0" x-data="{ open: false }">
-            <button @click="open = !open" class="w-11 h-11 -m-1 flex items-center justify-center text-aux-muted hover:text-aux-text">
-                <x-icon name="volume" class="w-5 h-5" />
-            </button>
-            <div x-show="open" x-cloak @click.outside="open = false"
-                 class="absolute right-0 bottom-full mb-3 w-64 rounded-xl bg-aux-card-hover border border-aux-border shadow-xl p-2 z-30">
-                <button wire:click="setTab('queue')" @click="open = false"
-                        class="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/5 text-sm">
-                    <x-icon name="queue-list" class="w-5 h-5" /> Queue
-                </button>
-
-                @if ($this->isHost)
-                    <p class="mt-1 px-3 pt-2 text-[11px] uppercase tracking-wide text-aux-faint">Device</p>
-                    @forelse ($this->devices as $device)
-                        <button wire:click="selectDevice('{{ $device['id'] }}', '{{ $device['name'] }}')"
-                                class="w-full text-left px-3 py-3 rounded-lg text-sm {{ ($room->playbackProvider?->spotifyAccount?->active_device_id ?? null) === $device['id'] ? 'bg-aux-accent-soft text-aux-accent' : 'hover:bg-white/5' }}">
-                            {{ $device['name'] }}
-                        </button>
-                    @empty
-                        <p class="px-3 py-2 text-xs text-aux-faint">No devices found. Open Spotify somewhere first.</p>
-                    @endforelse
-                @endif
-
-                <div class="px-3 pt-3 pb-1" x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume">
-                    <div class="flex items-center justify-between text-[11px] text-aux-faint mb-2">
-                        <span class="uppercase tracking-wide">Volume{{ $room->volume_supported ? '' : ' (not adjustable on this device)' }}</span>
-                        <span x-text="volume"></span>
-                    </div>
-                    <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume') || ! $room->volume_supported)
-                           :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%); background-clip: content-box;`"
-                           x-on:input="volume = $event.target.valueAsNumber"
-                           wire:change="setVolume($event.target.value)" class="seek-bar w-full disabled:opacity-30">
-                </div>
             </div>
         </div>
     </div>

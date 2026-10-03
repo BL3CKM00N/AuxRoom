@@ -1,6 +1,9 @@
 {{-- Now Playing --}}
+{{-- Below lg the two columns are transparent (display: contents) so every card is a direct
+     child of the grid and can be ordered on its own: now playing, find music, playlist, queue,
+     emergency stop. From lg up they are the usual two columns and the order classes do nothing. --}}
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-    <div class="lg:col-span-2 space-y-6">
+    <div class="contents lg:block lg:col-span-2 lg:space-y-6">
 
         {{-- Now playing --}}
         @php
@@ -17,7 +20,7 @@
             // track, which isn't shown as current). Device problems take priority.
             $playlistFinished = ! $spotifyDisconnected && ! $noDeviceAvailable && $room->playlistFinished();
         @endphp
-        <div class="p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border">
+        <div class="order-1 p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border">
             <div class="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
                 <div class="w-36 h-36 sm:w-28 sm:h-28 rounded-lg bg-aux-card-hover flex items-center justify-center shrink-0 overflow-hidden">
                     @if ($this->nowPlaying?->album_art_url)
@@ -101,6 +104,52 @@
                     @endif
                 </div>
             </div>
+
+            {{-- Mobile only: what the bottom player bar used to keep behind its volume
+                 button (device and volume). That bar is hidden below md now, so they
+                 live here, in the card, and show even when nothing is playing, since a
+                 host picks the device before anything plays. --}}
+            @php
+                $activeDeviceId = $room->playbackProvider?->spotifyAccount?->active_device_id;
+                $activeDeviceName = collect($this->devices)->firstWhere('id', $activeDeviceId)['name']
+                    ?? $room->playbackProvider?->spotifyAccount?->active_device_name;
+            @endphp
+            <div class="md:hidden mt-5 pt-4 border-t border-aux-border space-y-4">
+                @if ($this->isHost)
+                    <div x-data="{ open: false }">
+                        <button type="button" @click="open = !open" class="w-full flex items-center gap-3 text-left">
+                            <x-icon name="device" class="w-5 h-5 text-aux-muted shrink-0" />
+                            <span class="min-w-0 flex-1">
+                                <span class="block text-[11px] uppercase tracking-wide text-aux-faint">Playing on</span>
+                                <span class="block text-sm truncate">{{ $activeDeviceName ?: 'Choose a device' }}</span>
+                            </span>
+                            <x-icon name="chevron-up-down" class="w-4 h-4 text-aux-faint shrink-0" />
+                        </button>
+                        <div x-show="open" x-cloak class="mt-2 rounded-lg bg-aux-card-hover border border-aux-border p-1">
+                            @forelse ($this->devices as $device)
+                                <button type="button" wire:click="selectDevice({{ \Illuminate\Support\Js::from($device['id']) }}, {{ \Illuminate\Support\Js::from($device['name']) }})" @click="open = false"
+                                        class="w-full text-left px-3 py-3 rounded-md text-sm {{ $activeDeviceId === $device['id'] ? 'bg-aux-accent-soft text-aux-accent' : 'hover:bg-white/5' }}">
+                                    {{ $device['name'] }}
+                                </button>
+                            @empty
+                                <p class="px-3 py-2 text-xs text-aux-faint">No devices found. Open Spotify somewhere first.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
+
+                <div x-data="{ volume: {{ $room->volume_percent }} }" x-on:playback-sync.window="volume = $event.detail.volumePercent ?? volume">
+                    <div class="flex items-center gap-3 mb-2">
+                        <x-icon name="volume" class="w-5 h-5 shrink-0 {{ $this->canGuest('guests_can_set_volume') && $room->volume_supported ? 'text-aux-muted' : 'text-aux-faint opacity-40' }}" />
+                        <span class="text-[11px] uppercase tracking-wide text-aux-faint flex-1">Volume{{ $room->volume_supported ? '' : ' (not adjustable on this device)' }}</span>
+                        <span class="text-xs text-aux-faint" x-text="volume"></span>
+                    </div>
+                    <input type="range" min="0" max="100" :value="volume" @disabled(! $this->canGuest('guests_can_set_volume') || ! $room->volume_supported)
+                           :style="`background: linear-gradient(to right, #22c55e ${volume}%, rgba(255,255,255,0.12) ${volume}%); background-clip: content-box;`"
+                           x-on:input="volume = $event.target.valueAsNumber"
+                           wire:change="setVolume($event.target.value)" class="seek-bar w-full disabled:opacity-30">
+                </div>
+            </div>
         </div>
 
         {{-- Up next --}}
@@ -112,7 +161,7 @@
             $onLastTrack = $this->nowPlaying && $room->repeat_mode === 'off' && ! $room->shuffle_enabled
                 && \App\Models\Room::isPlayableContext($room->now_playing_context_uri) && ! $room->now_playing_queue_item_id;
         @endphp
-        <div class="p-6 rounded-xl bg-aux-card border border-aux-border">
+        <div class="order-4 p-6 rounded-xl bg-aux-card border border-aux-border">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <h3 class="font-semibold">Up Next</h3>
@@ -191,13 +240,13 @@
         </div>
     </div>
 
-    <div class="space-y-6">
+    <div class="contents lg:block lg:space-y-6">
 
         {{-- Find music --}}
         @php
             $outOfRange = ! $this->isHost && $room->location_enforced && ! $this->member->passesLocationCheck();
         @endphp
-        <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
+        <div class="order-2 p-5 rounded-xl bg-aux-card border border-aux-border">
             <div class="flex items-center justify-between">
                 <h3 class="font-semibold">Find Music</h3>
                 @if ($outOfRange)
@@ -277,7 +326,7 @@
 
         {{-- Playlist --}}
         @if ($this->isMock)
-            <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
+            <div class="order-3 p-5 rounded-xl bg-aux-card border border-aux-border">
                 <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify.</p>
                 <p class="mt-3 text-sm text-aux-faint">
@@ -285,7 +334,7 @@
                 </p>
             </div>
         @elseif ($this->canGuest('guests_can_manage_playlist'))
-            <div class="p-5 rounded-xl bg-aux-card border border-aux-border">
+            <div class="order-3 p-5 rounded-xl bg-aux-card border border-aux-border">
                 <h3 class="font-semibold">Playlist</h3>
                 <p class="mt-1 text-xs text-aux-faint">Pick a playlist and it plays immediately, just like in Spotify. Added songs play next without interrupting it.</p>
 
@@ -298,7 +347,7 @@
 
         {{-- Emergency stop: locks queue additions instantly --}}
         @if ($this->isHost)
-            <div class="p-5 rounded-xl bg-red-500/10 border border-red-500/30">
+            <div class="order-5 p-5 rounded-xl bg-red-500/10 border border-red-500/30">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <x-icon name="zap" class="w-4 h-4 text-red-400" />

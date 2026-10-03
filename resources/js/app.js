@@ -7,6 +7,7 @@
  */
 
 import './echo';
+import './resume-sync';
 import './alpine/room-location';
 import './alpine/offline-overlay';
 import './alpine/qr-scanner';

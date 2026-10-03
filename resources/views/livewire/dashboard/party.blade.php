@@ -1,4 +1,4 @@
-<div wire:poll.5s="poll"
+<div wire:poll.5s="poll" x-on:app-resumed.window="$wire.poll()"
      x-data="{
         isTouch: matchMedia('(pointer: coarse)').matches,
         controlsVisible: true,
