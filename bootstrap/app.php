@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // so Laravel must trust the proxy to see the request as HTTPS —
         // otherwise secure cookies and https:// URL generation break.
         $middleware->trustProxies(at: '*');
+
+        // A short reference on every request: in the logs, and on error pages.
+        $middleware->append(\App\Http\Middleware\AssignRequestRef::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

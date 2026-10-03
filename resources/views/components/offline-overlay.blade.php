@@ -15,4 +15,5 @@
     </svg>
     <h2 class="mt-6 text-xl font-bold">You're offline</h2>
     <p class="mt-2 text-sm text-aux-muted max-w-xs">AuxRoom needs an internet connection to sync your room. We'll bring you back automatically once you're reconnected.</p>
+    <a href="{{ route('help') }}#net-offline" target="_blank" class="mt-3 text-xs text-aux-muted underline underline-offset-2">Why am I seeing this?</a>
 </div>

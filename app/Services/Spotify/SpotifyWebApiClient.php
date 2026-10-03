@@ -344,6 +344,21 @@ class SpotifyWebApiClient implements SpotifyClientContract
         return $queue;
     }
 
+    public function getProfile(): ?array
+    {
+        $response = $this->get('https://api.spotify.com/v1/me');
+
+        if (! $response || $response->failed()) {
+            return null;
+        }
+
+        return [
+            'id' => $response->json('id'),
+            'display_name' => $response->json('display_name'),
+            'product' => $response->json('product'),
+        ];
+    }
+
     public function getContextTrackIds(string $contextUri): ?array
     {
         if (! preg_match('/^spotify:(playlist|album):([A-Za-z0-9]+)$/', $contextUri, $m)) {

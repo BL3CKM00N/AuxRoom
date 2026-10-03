@@ -50,10 +50,10 @@
 
                 <div x-show="['denied', 'unavailable', 'nopicture', 'error'].includes(status)" class="absolute inset-0 flex items-center justify-center px-8 text-center bg-black">
                     <div class="max-w-xs">
-                        <p class="text-white text-sm" x-show="status === 'denied'">Camera access is blocked. Allow it for this site in your browser or phone settings, then try again.</p>
-                        <p class="text-white text-sm" x-show="status === 'unavailable'">No usable camera was found on this device. You can type the code instead.</p>
-                        <p class="text-white text-sm" x-show="status === 'nopicture'">The camera opened but isn't showing a picture. Try again, or type the code instead.</p>
-                        <p class="text-white text-sm" x-show="status === 'error'">The camera couldn't be started. You can type the code instead.</p>
+                        <p class="text-white text-sm" x-show="status === 'denied'">Camera access is blocked. Allow it for this site in your browser or phone settings, then try again. <a href="{{ route('help') }}#qr-denied" target="_blank" class="underline text-white/70">[QR-DENIED]</a></p>
+                        <p class="text-white text-sm" x-show="status === 'unavailable'">No usable camera was found on this device. You can type the code instead. <a href="{{ route('help') }}#qr-unavailable" target="_blank" class="underline text-white/70">[QR-UNAVAILABLE]</a></p>
+                        <p class="text-white text-sm" x-show="status === 'nopicture'">The camera opened but isn't showing a picture. Try again, or type the code instead. <a href="{{ route('help') }}#qr-nopicture" target="_blank" class="underline text-white/70">[QR-NOPICTURE]</a></p>
+                        <p class="text-white text-sm" x-show="status === 'error'">The camera couldn't be started. You can type the code instead. <a href="{{ route('help') }}#qr-error" target="_blank" class="underline text-white/70">[QR-ERROR]</a></p>
                         <div class="mt-5 flex items-center justify-center gap-3">
                             <button type="button" @click="close()" class="px-4 py-2 rounded-full border border-white/30 text-white text-sm">Type it instead</button>
                             <button type="button" @click="start()" class="px-4 py-2 rounded-full bg-aux-accent text-black text-sm font-semibold">Try again</button>

@@ -18,6 +18,14 @@ interface SpotifyClientContract
      */
     public function getDevices(bool $allowCached = false): array;
 
+    /**
+     * The connected account's profile, or null when Spotify wouldn't say. `product`
+     * is "premium" or "free"/"open".
+     *
+     * @return array{id: ?string, display_name: ?string, product: ?string}|null
+     */
+    public function getProfile(): ?array;
+
     public function playTrack(string $trackUri, ?string $deviceId, int $positionMs = 0): bool;
 
     /**

@@ -50,10 +50,13 @@
             </div>
         @endif
 
+        {{-- The Spotify connect flow redirects here with an "error" flash; this page used to show only "status", so a failed or cancelled connection from Room Settings said nothing. --}}
+        @if (session('error'))
+            <x-error-notice :message="session('error')" :code="session('error_code')" :details="session('error_details')" :is-host="$this->isHost" />
+        @endif
+
         @if ($controlError)
-            <div class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
-                {{ $controlError }}
-            </div>
+            <x-error-notice :message="$controlError" :code="$controlErrorCode" :details="$controlErrorDetails" :is-host="$this->isHost" />
         @endif
 
         @if ($room->location_enforced && ! $this->member->passesLocationCheck())

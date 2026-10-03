@@ -56,7 +56,7 @@ trait HandlesLocationEnforcement
     {
         if ($this->room->isWithinBoundary($lat, $lng, $isRecheck ? 20 : 0)) {
             $this->member->update(['location_verified_at' => now()]);
-            $this->controlError = '';
+            $this->clearError();
 
             return;
         }
@@ -67,6 +67,6 @@ trait HandlesLocationEnforcement
             return;
         }
 
-        $this->controlError = 'You need to be closer to the room to control playback.';
+        $this->fail('ROOM-TOO-FAR', 'You need to be closer to the room to control playback.');
     }
 }

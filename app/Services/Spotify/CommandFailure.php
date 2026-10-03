@@ -19,16 +19,34 @@ class CommandFailure
 
     private ?string $reason = null;
 
+    private ?string $message = null;
+
     public function clear(): void
     {
         $this->status = null;
         $this->reason = null;
+        $this->message = null;
     }
 
     public function record(?int $status, ?string $body): void
     {
         $this->status = $status;
-        $this->reason = $body ? (json_decode($body, true)['error']['reason'] ?? null) : null;
+        $error = $body ? (json_decode($body, true)['error'] ?? null) : null;
+        $this->reason = is_array($error) ? ($error['reason'] ?? null) : null;
+        $this->message = is_array($error) && is_string($error['message'] ?? null) ? $error['message'] : null;
+    }
+
+    /**
+     * What Spotify answered, for the "copy details" block. Only the status and
+     * Spotify's own reason and message: never the request, URL or any token.
+     */
+    public function summary(): ?string
+    {
+        if ($this->status === null && $this->reason === null) {
+            return 'No answer from Spotify (timeout or connection problem).';
+        }
+
+        return trim("Spotify answered {$this->status}".($this->reason ? " ({$this->reason})" : '').($this->message ? ": {$this->message}" : ''));
     }
 
     /** True when the device the command was aimed at can't be reached. */

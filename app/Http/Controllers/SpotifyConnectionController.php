@@ -47,17 +47,23 @@ class SpotifyConnectionController extends Controller
         $expectedState = $request->session()->pull('spotify_oauth_state');
 
         if ($request->query('error')) {
-            return redirect()->route('dashboard')->with('error', 'Spotify connection was cancelled: '.$request->query('error'));
+            return redirect()->route('dashboard')
+                ->with('error', 'Spotify connection was cancelled: '.$request->query('error'))
+                ->with('error_code', 'SP-CONNECT-CANCELLED');
         }
 
         if (! $expectedState || $request->query('state') !== $expectedState) {
-            return redirect()->route('dashboard')->with('error', 'Spotify connection could not be verified. Please try again.');
+            return redirect()->route('dashboard')
+                ->with('error', 'Spotify connection could not be verified. Please try again.')
+                ->with('error_code', 'SP-CONNECT-STATE');
         }
 
         $account = $request->user()->spotifyAccount;
 
         if (! $account) {
-            return redirect()->route('dashboard')->with('error', 'Add your Spotify app credentials first.');
+            return redirect()->route('dashboard')
+                ->with('error', 'Add your Spotify app credentials first.')
+                ->with('error_code', 'SP-CONNECT-CREDS');
         }
 
         $response = Http::asForm()
@@ -69,7 +75,11 @@ class SpotifyConnectionController extends Controller
             ]);
 
         if ($response->failed()) {
-            return redirect()->route('dashboard')->with('error', 'Spotify rejected the connection: '.$response->json('error_description', 'unknown error'));
+            return redirect()->route('dashboard')
+                ->with('error', 'Spotify rejected the connection: '.$response->json('error_description', 'unknown error'))
+                ->with('error_code', 'SP-CONNECT-REJECTED')
+                // Spotify's own words only (e.g. "invalid_client"), never the credentials that were sent.
+                ->with('error_details', 'Spotify answered '.$response->status().' ('.$response->json('error', 'unknown').')');
         }
 
         $data = $response->json();

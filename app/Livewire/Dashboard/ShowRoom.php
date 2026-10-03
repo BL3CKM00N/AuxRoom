@@ -9,12 +9,15 @@ use App\Livewire\Dashboard\Concerns\HandlesPlayback;
 use App\Livewire\Dashboard\Concerns\HandlesPlaylistSearch;
 use App\Livewire\Dashboard\Concerns\ManagesConfirmModal;
 use App\Livewire\Dashboard\Concerns\ManagesGuestPermissions;
+use App\Livewire\Dashboard\Concerns\ReportsErrors;
 use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\ActivityEvent;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
+use App\Services\Spotify\SpotifyCheck;
 use App\Services\Spotify\UpcomingQueue;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -27,6 +30,7 @@ class ShowRoom extends Component
     use HandlesPlaylistSearch;
     use ManagesConfirmModal;
     use ManagesGuestPermissions;
+    use ReportsErrors;
     use ResolvesSpotifyDevices;
 
     #[Locked]
@@ -78,6 +82,38 @@ class ShowRoom extends Component
         if (! request()->has('tab')) {
             $this->activeTab = 'queue';
         }
+    }
+
+    /**
+     * The Hub's "Check Spotify" results. Locked: only runSpotifyCheck() fills it.
+     *
+     * @var array<int, array{id: string, label: string, status: string, detail: string, code: ?string}>
+     */
+    #[Locked]
+    public array $spotifyCheck = [];
+
+    #[Locked]
+    public string $spotifyCheckedAt = '';
+
+    /** Host only, and limited: every run is a few calls on the host's Spotify quota. */
+    public function runSpotifyCheck(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $key = 'spotify-check:'.$this->room->id;
+
+        if (RateLimiter::tooManyAttempts($key, 6)) {
+            $this->spotifyCheck = [['id' => 'limit', 'label' => 'Check Spotify', 'status' => 'warn', 'detail' => 'That was checked a lot just now. Wait a minute and try again.', 'code' => null]];
+
+            return;
+        }
+
+        RateLimiter::hit($key, 60);
+
+        $this->spotifyCheck = app(SpotifyCheck::class)->run($this->room);
+        $this->spotifyCheckedAt = now()->format('H:i:s');
     }
 
     public function setTab(string $tab): void

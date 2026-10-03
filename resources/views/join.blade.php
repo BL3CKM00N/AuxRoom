@@ -12,6 +12,9 @@
     @if ($errors->any())
         <div class="mb-4 p-3 bg-red-500/10 text-red-400 rounded text-sm">
             {{ $errors->first() }}
+            @if ($errors->has('invite_code'))
+                <a href="{{ route('help') }}#join-code" target="_blank" class="ml-1 underline underline-offset-2 hover:text-red-300">What does this mean?</a>
+            @endif
         </div>
     @endif
 
@@ -35,4 +38,8 @@
 
         <x-primary-button type="submit" class="w-full justify-center">Join room</x-primary-button>
     </form>
+
+    <p class="mt-5 text-center text-xs text-aux-faint">
+        Trouble joining? <a href="{{ route('help') }}" class="underline underline-offset-2 hover:text-aux-text">Help with errors</a>
+    </p>
 </x-guest-layout>

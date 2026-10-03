@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\RoomController;
@@ -10,6 +11,8 @@ use App\Livewire\Dashboard\ShowRoom;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class);
+
+Route::get('/help', HelpController::class)->name('help');
 
 Route::get('/join', [JoinController::class, 'create'])->name('join');
 // Throttled because every successful submit creates a guest member row.

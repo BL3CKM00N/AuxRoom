@@ -37,6 +37,7 @@
                      drifts and parallaxes behind it. --}}
                 <nav class="flex items-center gap-4 text-sm text-aux-muted bg-aux-card/80 backdrop-blur-md border border-aux-border rounded-full px-4 py-2">
                     {{-- Logged-in visitors never get this page (see HomeController). --}}
+                    <a href="{{ route('help') }}" class="hover:text-aux-text">Help</a>
                     <a href="{{ route('login') }}" wire:navigate class="hover:text-aux-text">Log in</a>
                     <a href="{{ route('register') }}" wire:navigate class="hover:text-aux-text">Sign up</a>
                 </nav>

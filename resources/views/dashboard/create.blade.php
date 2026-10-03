@@ -9,9 +9,7 @@
             @endif
 
             @if (session('error'))
-                <div class="p-4 bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg text-sm">
-                    {{ session('error') }}
-                </div>
+                <x-error-notice class="!mx-0 !mt-0" :message="session('error')" :code="session('error_code')" :details="session('error_details')" :is-host="true" />
             @endif
 
             {{-- Step 1: connect Spotify (skippable) --}}
@@ -85,7 +83,8 @@
                                     </button>
                                 </div>
 
-                                <p class="text-xs text-red-400" x-show="locateError" x-text="locateError" x-cloak></p>
+                                <p class="text-xs text-red-400" x-show="locateError" x-cloak><span x-text="locateError"></span> <a x-show="locateError" x-cloak target="_blank" class="ml-1 underline"
+                   :href="'{{ route('help') }}#' + (locateError.startsWith('Geolocation') ? 'loc-unsupported' : locateError.startsWith('Could not') ? 'loc-failed' : locateError.startsWith('Enter a valid') ? 'loc-invalid' : 'loc-unset')">Help</a></p>
                                 <p class="text-xs text-aux-muted" x-show="hasPosition" x-cloak>
                                     Pin at <span x-text="lat !== null ? lat.toFixed(5) : ''"></span>, <span x-text="lng !== null ? lng.toFixed(5) : ''"></span>. Click or drag the pin on the map to adjust.
                                 </p>

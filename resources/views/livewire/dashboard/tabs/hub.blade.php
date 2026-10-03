@@ -129,7 +129,8 @@
                 </button>
             </div>
 
-            <p class="mt-2 text-[11px] text-red-400" x-show="locateError" x-text="locateError" x-cloak></p>
+            <p class="mt-2 text-[11px] text-red-400" x-show="locateError" x-cloak><span x-text="locateError"></span> <a x-show="locateError" x-cloak target="_blank" class="ml-1 underline"
+                   :href="'{{ route('help') }}#' + (locateError.startsWith('Geolocation') ? 'loc-unsupported' : locateError.startsWith('Could not') ? 'loc-failed' : locateError.startsWith('Enter a valid') ? 'loc-invalid' : 'loc-unset')">Help</a></p>
             <p class="mt-2 text-[11px] text-aux-faint" x-show="hasPosition" x-cloak>
                 Pin at <span x-text="lat !== null ? lat.toFixed(5) : ''"></span>, <span x-text="lng !== null ? lng.toFixed(5) : ''"></span>. Click or drag the pin on the map to adjust.
             </p>
@@ -220,6 +221,46 @@
     <div class="w-full">
         @include('livewire.dashboard.tabs.partials.activity')
     </div>
+
+    {{-- Check Spotify: the read-only questions behind most Spotify problems, with the fix for each. --}}
+    @if ($this->isHost)
+        <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="font-medium text-sm">Check Spotify</p>
+                    <p class="text-xs text-aux-faint mt-1">Tests the login, Premium, devices and playback, and says what to fix.</p>
+                </div>
+                <button type="button" wire:click="runSpotifyCheck" wire:loading.attr="disabled" wire:target="runSpotifyCheck"
+                        class="shrink-0 px-4 py-2 rounded-full bg-aux-card-hover text-xs font-semibold hover:bg-white/10 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="runSpotifyCheck">{{ $spotifyCheck ? 'Check again' : 'Run check' }}</span>
+                    <span wire:loading wire:target="runSpotifyCheck">Checking&hellip;</span>
+                </button>
+            </div>
+
+            @if ($spotifyCheck)
+                <ul class="mt-4 space-y-2">
+                    @foreach ($spotifyCheck as $row)
+                        <li class="flex items-start gap-3 text-sm">
+                            <span class="mt-0.5 w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold
+                                {{ $row['status'] === 'ok' ? 'bg-aux-accent-soft text-aux-accent' : ($row['status'] === 'warn' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400') }}"
+                                  aria-label="{{ $row['status'] }}">{{ $row['status'] === 'ok' ? '✓' : ($row['status'] === 'warn' ? '!' : '✕') }}</span>
+                            <span class="min-w-0 flex-1">
+                                <span class="font-medium">{{ $row['label'] }}</span>
+                                <span class="block text-xs text-aux-muted">{{ $row['detail'] }}
+                                    @if ($row['code'])
+                                        <a href="{{ route('help') }}#{{ strtolower($row['code']) }}" target="_blank" class="underline underline-offset-2 hover:text-aux-text">How to fix [{{ $row['code'] }}]</a>
+                                    @endif
+                                </span>
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+                @if ($spotifyCheckedAt)
+                    <p class="mt-3 text-[11px] text-aux-faint">Checked at {{ $spotifyCheckedAt }}</p>
+                @endif
+            @endif
+        </div>
+    @endif
 
     {{-- Spotify connection: goes last, it's setup rather than day-to-day control --}}
     <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border flex flex-col">

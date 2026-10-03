@@ -3,7 +3,6 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Models\QueueItem;
-use App\Services\Spotify\CommandFailure;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\SpotifyClientFactory;
 
@@ -20,12 +19,6 @@ trait HandlesPlayback
     private function syncWithSpotify(): void
     {
         app(PlaybackSync::class)->sync($this->room, $this->member->id);
-    }
-
-    /** The message for a Spotify command that just failed: specific when Spotify said why, else $generic. */
-    private function commandFailureMessage(string $generic): string
-    {
-        return app(CommandFailure::class)->message($generic);
     }
 
     public function play(): void
@@ -55,7 +48,7 @@ trait HandlesPlayback
                     $this->room->shuffle_enabled,
                     $this->providerDeviceId()
                 )) {
-                    $this->controlError = $this->commandFailureMessage("Spotify couldn't resume the playlist. Try reselecting the device in Host Hub.");
+                    $this->failCommand('SP-CMD', "Spotify couldn't resume the playlist. Try reselecting the device in Host Hub.");
 
                     return;
                 }
@@ -123,7 +116,7 @@ trait HandlesPlayback
         $position = $this->room->currentPositionMs();
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->pause($this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't pause playback.");
+            $this->failCommand('SP-CMD', "Spotify couldn't pause playback.");
 
             return;
         }
@@ -150,7 +143,7 @@ trait HandlesPlayback
         }
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->skipToNext($this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't skip the track.");
+            $this->failCommand('SP-CMD', "Spotify couldn't skip the track.");
 
             return;
         }
@@ -168,7 +161,7 @@ trait HandlesPlayback
         }
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->skipToPrevious($this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't go back a track.");
+            $this->failCommand('SP-CMD', "Spotify couldn't go back a track.");
 
             return;
         }
@@ -188,7 +181,7 @@ trait HandlesPlayback
         $enabled = ! $this->room->shuffle_enabled;
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setShuffle($enabled, $this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't change shuffle.");
+            $this->failCommand('SP-CMD', "Spotify couldn't change shuffle.");
 
             return;
         }
@@ -208,7 +201,7 @@ trait HandlesPlayback
         $next = $modes[(array_search($this->room->repeat_mode, $modes, true) + 1) % count($modes)];
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setRepeat($next, $this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't change repeat mode.");
+            $this->failCommand('SP-CMD', "Spotify couldn't change repeat mode.");
 
             return;
         }
@@ -231,7 +224,7 @@ trait HandlesPlayback
         $ms = max(0, $duration > 0 ? min($ms, $duration) : $ms);
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->seek($ms, $this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't seek playback.");
+            $this->failCommand('SP-CMD', "Spotify couldn't seek playback.");
 
             return;
         }
@@ -252,7 +245,7 @@ trait HandlesPlayback
         }
 
         if (! $this->room->volume_supported) {
-            $this->controlError = "This device's volume can't be changed from here. Use the device itself.";
+            $this->fail('SP-VOLUME', "This device's volume can't be changed from here. Use the device itself.");
 
             return;
         }
@@ -260,7 +253,7 @@ trait HandlesPlayback
         $percent = max(0, min(100, $percent));
 
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->setVolume($percent, $this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't change the volume.");
+            $this->failCommand('SP-CMD', "Spotify couldn't change the volume.");
 
             return;
         }
@@ -355,7 +348,7 @@ trait HandlesPlayback
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
         if (! $client->playTrack('spotify:track:'.$spotifyTrackId, $this->providerDeviceId(), $positionMs)) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't start playback. Try reselecting the device in Host Hub.");
+            $this->failCommand('SP-CMD', "Spotify couldn't start playback. Try reselecting the device in Host Hub.");
 
             return false;
         }
@@ -398,7 +391,7 @@ trait HandlesPlayback
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
         if (! $client->playContext($this->room->fallback_playlist_uri, $this->providerDeviceId(), true)) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't start the fallback playlist. Try reselecting the device in Host Hub.");
+            $this->failCommand('SP-CMD', "Spotify couldn't start the fallback playlist. Try reselecting the device in Host Hub.");
 
             return false;
         }

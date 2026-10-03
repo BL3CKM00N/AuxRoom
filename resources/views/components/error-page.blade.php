@@ -31,9 +31,52 @@
                 <h1 class="mt-2 text-2xl sm:text-3xl font-bold">{{ $title }}</h1>
                 <p class="mt-3 text-sm text-aux-muted">{{ $message }}</p>
 
+                @php
+                    $entry = \App\Support\Errors\ErrorCatalog::find('HTTP-'.$code);
+                    $ref = request()->attributes->get('ref');
+                    $copy = collect([
+                        "AuxRoom error {$code}: {$title}",
+                        $ref ? "Reference: {$ref}" : null,
+                        'Time: '.now()->utc()->format('Y-m-d H:i:s').' UTC',
+                    ])->filter()->implode("\n");
+                @endphp
+
+                {{-- Folded away: the page reads as title, message and a way home; the why and the
+                     steps are one tap behind "Learn more". A native <details>, because these
+                     pages load no Alpine. --}}
+                @if ($entry)
+                    <details class="group mt-5 text-left">
+                        <summary class="cursor-pointer list-none text-center text-sm text-aux-muted hover:text-aux-text select-none">
+                            <span class="underline underline-offset-2">Learn more</span>
+                            <span class="inline-block transition-transform group-open:rotate-180" aria-hidden="true">&#9662;</span>
+                        </summary>
+                        <div class="mt-3 text-sm text-aux-muted space-y-2">
+                            <p><span class="font-semibold text-aux-text">Why.</span> {{ $entry['why'] }}</p>
+                            <p class="font-semibold text-aux-text">What you can try</p>
+                            <ol class="list-decimal pl-5 space-y-1">
+                                @foreach ($entry['guest'] as $step)
+                                    <li>{{ $step }}</li>
+                                @endforeach
+                            </ol>
+                            <p class="pt-1 text-center">
+                                <a href="{{ route('help') }}#{{ strtolower($entry['code']) }}" class="underline underline-offset-2 hover:text-aux-text">Full guide</a>
+                            </p>
+                        </div>
+                    </details>
+                @endif
+
+                @if ($ref)
+                    <p class="mt-4 text-[11px] text-aux-faint">Reference <span class="font-mono">{{ $ref }}</span></p>
+                @endif
+
                 <a href="/" class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-aux-accent text-black text-sm font-semibold hover:bg-aux-accent-strong">
                     Go back home
                 </a>
+
+                <div class="mt-4 flex items-center justify-center gap-4 text-xs text-aux-muted">
+                    <button type="button" class="underline underline-offset-2 hover:text-aux-text" data-copy="{{ $copy }}"
+                            onclick="navigator.clipboard && navigator.clipboard.writeText(this.dataset.copy).then(() => { this.textContent = 'Copied'; })">Copy details</button>
+                </div>
             </div>
         </div>
 

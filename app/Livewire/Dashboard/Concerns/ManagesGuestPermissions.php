@@ -50,36 +50,36 @@ trait ManagesGuestPermissions
 
     private function passesGate(string $ability): bool
     {
-        $this->controlError = '';
+        $this->clearError();
 
         if (! $this->isApproved) {
-            $this->controlError = 'Waiting for the host to let you in.';
+            $this->fail('ROOM-WAITING', 'Waiting for the host to let you in.');
 
             return false;
         }
 
         if ($this->spotifyNeedsReconnect) {
-            $this->controlError = $this->isHost
+            $this->fail('SP-DISCONNECTED', $this->isHost
                 ? 'Your Spotify connection expired. Reconnect it in Room Settings.'
-                : 'Spotify needs to be reconnected by the host.';
+                : 'Spotify needs to be reconnected by the host.');
 
             return false;
         }
 
         if (! $this->isHost && $ability === 'guests_can_add_to_queue' && ! $this->room->guests_can_add_to_queue) {
-            $this->controlError = 'The host has locked the queue for everyone.';
+            $this->fail('ROOM-QUEUE-LOCKED', 'The host has locked the queue for everyone.');
 
             return false;
         }
 
         if (! $this->isHost && $ability !== 'guests_can_add_to_queue' && ! (bool) $this->member->{self::ABILITY_COLUMNS[$ability]}) {
-            $this->controlError = 'The host hasn\'t given you this permission.';
+            $this->fail('ROOM-NO-PERMISSION', 'The host hasn\'t given you this permission.');
 
             return false;
         }
 
         if (! $this->member->passesLocationCheck()) {
-            $this->controlError = 'You need to verify you\'re near the room before controlling playback.';
+            $this->fail('ROOM-VERIFY-LOCATION', 'You need to verify you\'re near the room before controlling playback.');
 
             return false;
         }

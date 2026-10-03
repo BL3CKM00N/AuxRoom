@@ -41,7 +41,7 @@ trait HandlesPlaylistSearch
 
     public function search(): void
     {
-        $this->controlError = '';
+        $this->clearError();
 
         $query = mb_substr(trim($this->search), 0, 100);
 
@@ -92,7 +92,7 @@ trait HandlesPlaylistSearch
             $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
             if (! $client->addToPlaybackQueue('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId())) {
-                $this->controlError = $this->commandFailureMessage("Spotify couldn't queue that song. Try reselecting the device in Host Hub.");
+                $this->failCommand('SP-CMD', "Spotify couldn't queue that song. Try reselecting the device in Host Hub.");
             }
         }
 
@@ -217,7 +217,7 @@ trait HandlesPlaylistSearch
         $context = $this->room->now_playing_context_uri ?? $this->room->fallback_playlist_uri;
 
         if (! Room::isPlayableContext($context)) {
-            $this->controlError = "That track isn't part of a playlist or album Spotify is playing, so it can't be jumped to.";
+            $this->fail('SP-NO-CONTEXT', "That track isn't part of a playlist or album Spotify is playing, so it can't be jumped to.");
 
             return;
         }
@@ -228,7 +228,7 @@ trait HandlesPlaylistSearch
         $track = $this->queue->where('is_queued', false)->firstWhere('spotify_track_id', $trackId);
 
         if (! $track) {
-            $this->controlError = "That track isn't coming up any more. The list has been refreshed.";
+            $this->fail('SP-TRACK-GONE', "That track isn't coming up any more. The list has been refreshed.");
 
             return;
         }
@@ -236,12 +236,12 @@ trait HandlesPlaylistSearch
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
         if (! $client->playContextAtTrack($context, 'spotify:track:'.$trackId, 0, $this->providerDeviceId())) {
-            $this->controlError = $this->commandFailureMessage("Spotify couldn't play that track. Try reselecting the device in Host Hub.");
+            $this->failCommand('SP-CMD', "Spotify couldn't play that track. Try reselecting the device in Host Hub.");
 
             return;
         }
 
-        $this->controlError = '';
+        $this->clearError();
 
         $this->room->update([
             'now_playing_queue_item_id' => null,
