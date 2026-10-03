@@ -25,11 +25,16 @@ class RealtimeConfigTest extends TestCase
         $this->get('/join')->assertOk()->assertDontSee('reverb-key', false);
     }
 
-    public function test_the_client_no_longer_depends_on_build_time_reverb_variables(): void
+    public function test_the_client_reads_the_env_settings_but_ignores_unexpanded_placeholders(): void
     {
         $js = file_get_contents(resource_path('js/echo.js'));
 
-        $this->assertStringNotContainsString('VITE_REVERB', $js, 'production never expanded these; the browser tried to connect to "${REVERB_HOST}"');
-        $this->assertStringContainsString('reverb-key', $js);
+        foreach (['VITE_REVERB_APP_KEY', 'VITE_REVERB_HOST', 'VITE_REVERB_PORT', 'VITE_REVERB_SCHEME'] as $variable) {
+            $this->assertStringContainsString($variable, $js, "{$variable} is still the first source");
+        }
+
+        // Production passed these through as the literal text "${REVERB_HOST}"; such a value must not be used.
+        $this->assertStringContainsString("includes('\${')", $js);
+        $this->assertStringContainsString('reverb-key', $js, 'and the meta tag / page host are the fallback');
     }
 }
