@@ -92,7 +92,7 @@ trait HandlesPlaylistSearch
             $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
             if (! $client->addToPlaybackQueue('spotify:track:'.$item->spotify_track_id, $this->providerDeviceId())) {
-                $this->controlError = "Spotify couldn't queue that song. Try reselecting the device in Host Hub.";
+                $this->controlError = $this->commandFailureMessage("Spotify couldn't queue that song. Try reselecting the device in Host Hub.");
             }
         }
 
@@ -236,7 +236,7 @@ trait HandlesPlaylistSearch
         $client = app(SpotifyClientFactory::class)->forRoom($this->room);
 
         if (! $client->playContextAtTrack($context, 'spotify:track:'.$trackId, 0, $this->providerDeviceId())) {
-            $this->controlError = "Spotify couldn't play that track. Try reselecting the device in Host Hub.";
+            $this->controlError = $this->commandFailureMessage("Spotify couldn't play that track. Try reselecting the device in Host Hub.");
 
             return;
         }

@@ -295,10 +295,12 @@ class SpotifyWebApiClient implements SpotifyClientContract
             $url .= '?'.http_build_query($query);
         }
 
+        app(CommandFailure::class)->clear();
         $response = $this->send('post', $url);
         $this->forgetCachedReads();
 
         if (! $response || $response->failed()) {
+            app(CommandFailure::class)->record($response?->status(), $response?->body());
             Log::warning('Spotify playback command failed', ['url' => $url, 'status' => $response?->status(), 'body' => $response?->body()]);
         }
 
@@ -484,10 +486,12 @@ class SpotifyWebApiClient implements SpotifyClientContract
             $url .= '?'.http_build_query($query);
         }
 
+        app(CommandFailure::class)->clear();
         $response = $this->send('put', $url, $body);
         $this->forgetCachedReads();
 
         if (! $response || $response->failed()) {
+            app(CommandFailure::class)->record($response?->status(), $response?->body());
             Log::warning('Spotify playback command failed', [
                 'url' => $url,
                 'status' => $response?->status(),
