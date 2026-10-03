@@ -35,12 +35,9 @@
                      directly on the aurora goes in and out of contrast as it
                      drifts and parallaxes behind it. --}}
                 <nav class="flex items-center gap-4 text-sm text-aux-muted bg-aux-card/80 backdrop-blur-md border border-aux-border rounded-full px-4 py-2">
-                    @auth
-                        <a href="{{ route('dashboard') }}" wire:navigate class="hover:text-aux-text">Your room</a>
-                    @else
-                        <a href="{{ route('login') }}" wire:navigate class="hover:text-aux-text">Log in</a>
-                        <a href="{{ route('register') }}" wire:navigate class="hover:text-aux-text">Sign up</a>
-                    @endauth
+                    {{-- Logged-in visitors never get this page (see HomeController). --}}
+                    <a href="{{ route('login') }}" wire:navigate class="hover:text-aux-text">Log in</a>
+                    <a href="{{ route('register') }}" wire:navigate class="hover:text-aux-text">Sign up</a>
                 </nav>
             </header>
 
@@ -63,17 +60,10 @@
                         </p>
 
                         <div class="mt-8 flex flex-wrap justify-center lg:justify-start gap-3">
-                            @auth
-                                <a href="{{ route('rooms.create') }}" wire:navigate
-                                   class="inline-flex items-center px-5 py-2.5 bg-aux-accent text-black rounded-full font-semibold hover:bg-aux-accent-strong">
-                                    Host a room
-                                </a>
-                            @else
-                                <a href="{{ route('register') }}" wire:navigate
-                                   class="inline-flex items-center px-5 py-2.5 bg-aux-accent text-black rounded-full font-semibold hover:bg-aux-accent-strong">
-                                    Host a room
-                                </a>
-                            @endauth
+                            <a href="{{ route('register') }}" wire:navigate
+                               class="inline-flex items-center px-5 py-2.5 bg-aux-accent text-black rounded-full font-semibold hover:bg-aux-accent-strong">
+                                Host a room
+                            </a>
                             <a href="{{ route('join') }}" wire:navigate
                                class="inline-flex items-center px-5 py-2.5 border border-aux-border rounded-full font-medium hover:bg-aux-card">
                                 Join room
