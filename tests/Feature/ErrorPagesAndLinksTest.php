@@ -61,7 +61,7 @@ class ErrorPagesAndLinksTest extends TestCase
         $room = Room::create(['invite_code' => 'AAAAAA-BBBBBB-CCCCCC', 'host_id' => $owner->id, 'playback_provider_id' => $owner->id]);
 
         $this->actingAs(User::factory()->create())->delete(route('rooms.destroy', $room))
-            ->assertForbidden()->assertSee('#http-403', false)->assertSee('Only the host can do this');
+            ->assertForbidden()->assertSee('#http-403', false)->assertSee('only the host can do');
     }
 
     public function test_a_wrong_invite_code_links_to_its_guide(): void
