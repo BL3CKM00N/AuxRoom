@@ -165,4 +165,19 @@ class SharePreviewTest extends TestCase
         $this->assertSame('Someone', \App\Services\ShareImage::drawableName('🎧🎧'));
         $this->assertSame('Someone', \App\Services\ShareImage::drawableName(''));
     }
+
+    public function test_the_background_is_shielded_from_livewire_rerenders_and_uses_the_prerendered_pictures(): void
+    {
+        $room = $this->room();
+
+        $html = $this->get(route('rooms.party', $room))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<div class="green-waves"[^>]*wire:ignore/', $html, 'Livewire would reset the classes the background script adds');
+        $this->assertStringContainsString(asset('images/aurora-a.jpg'), $html);
+        $this->assertStringContainsString(asset('images/aurora-b.jpg'), $html);
+        $this->assertStringNotContainsString('<animate', $html, 'the per-frame SVG morph must stay gone');
+        $this->assertFileExists(public_path('images/aurora-a.jpg'));
+        $this->assertFileExists(public_path('images/aurora-b.jpg'));
+        $this->assertFileExists(public_path('images/grain.png'));
+    }
 }

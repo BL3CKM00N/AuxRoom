@@ -8,7 +8,6 @@
 
 import './echo';
 import './alpine/room-location';
-import './alpine/ambient-background';
 import './alpine/offline-overlay';
 import './alpine/qr-scanner';
 

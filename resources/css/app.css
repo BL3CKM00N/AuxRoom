@@ -102,13 +102,12 @@ input[type='range']::-moz-range-thumb {
     background: #22c55e;
 }
 
-/* Aurora background (the <x-ambient-background /> component): a hand-built
-   SVG "curtain of light" scene. The ribbons morph on their own loop via
-   native SVG <animate> on each path's `d` (see the component), not CSS. A
-   bit of JS (resources/js/alpine/ambient-background.js) layers a subtle
-   cursor-parallax on top by writing --px/--py onto .green-waves, eased
-   toward the pointer instead of following it 1:1. `position: fixed` so it
-   always fills the viewport regardless of page height. */
+/* Aurora background (the <x-ambient-background /> component): two
+   pre-rendered pictures drawn on canvases and cross-faded very slowly. See
+   the component for why it is built this way. Both the fade and the cursor
+   parallax (a transform written by the component's script, only while the
+   pointer is moving) run on the compositor, so nothing repaints per frame.
+   `position: fixed` so it always fills the viewport regardless of page height. */
 .green-waves {
     position: fixed;
     inset: 0;
@@ -128,58 +127,64 @@ input[type='range']::-moz-range-thumb {
                 linear-gradient(0deg, #030e0d 0%, #030e0d00 35%);
 }
 
-/* Oversized (inset: -8%, not 0) so the parallax offset below never reveals a
-   hard edge. Carries only the cursor-parallax transform; the ribbons' own
-   motion lives inside the SVG itself now (SMIL `<animate>` on each path),
-   not on this element. */
+/* Oversized (inset: -8%, not 0) so the parallax offset never reveals a hard
+   edge. Fades in once both pictures are drawn. */
 .aurora-parallax {
     position: absolute;
     inset: -8%;
-    transform: translate3d(calc(var(--px, 0) * var(--depth, 1) * 1%), calc(var(--py, 0) * var(--depth, 1) * 1%), 0);
+    opacity: 0;
+    transition: opacity 1.2s ease;
+    will-change: transform;
 }
 
-.aurora-art {
+.aurora-parallax.is-ready {
+    opacity: 1;
+}
+
+.aurora-layer {
     position: absolute;
     inset: 0;
-}
-
-.aurora-art svg {
-    display: block;
     width: 100%;
     height: 100%;
+    object-fit: cover;
+}
+
+/* The second picture fades in over the first and back out, forever: a slow
+   dissolve between two moments of the aurora's old morph. It is opaque, so
+   the dissolve never dips in the middle. */
+.aurora-layer-b {
+    opacity: 0;
+    will-change: opacity;
+    /* steps(): the fade changes about 4 times a second (each step is under half a percent), which is
+       invisible, instead of making the compositor redraw the full screen 60 times a second. */
+    animation: aurora-dissolve 60s steps(240) infinite alternate;
+}
+
+@keyframes aurora-dissolve {
+    to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .aurora-parallax {
-        transform: none;
+        transition: none;
+    }
+
+    .aurora-layer-b {
+        animation: none;
     }
 }
 
-/* Faint animated film-grain layer over the whole page: breaks up the flat
-   dark background and the blobs' gradient banding a little, the way a lot
-   of dark, glow-heavy UIs (Linear, Vercel, etc.) do it. Static SVG noise
-   tile, so it's one paint plus a cheap opacity flicker, no JS. */
+/* Faint film grain over the whole page: breaks up the flat dark background
+   and the gradients' banding a little. A static, pre-made noise tile with
+   plain alpha. It used to be a flickering full-screen layer with
+   `mix-blend-mode: overlay`, which made the browser re-blend the whole page. */
 .ambient-grain {
     position: fixed;
     inset: 0;
     z-index: 1;
     pointer-events: none;
-    opacity: 0.05;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 180px 180px;
-    animation: ambient-grain-flicker 1.4s steps(3) infinite;
-}
-
-@keyframes ambient-grain-flicker {
-    0%, 100% { opacity: 0.05; }
-    50%      { opacity: 0.03; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .ambient-grain {
-        animation: none;
-    }
+    /* background-image is set by the component (see there). */
+    background-size: 128px 128px;
 }
 
 /* Set while the QR scanner is open. The aurora's animated, heavily blurred
