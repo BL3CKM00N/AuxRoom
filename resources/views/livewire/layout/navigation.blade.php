@@ -111,6 +111,11 @@ new class extends Component
                             {{ __('Dashboard') }}
                         </x-nav-link>
                     @endif
+
+                    {{-- Opens in a new tab, like the Party Screen, so a room (and its playback) is never left. --}}
+                    <x-nav-link :href="route('help')" target="_blank" onclick="window.open(this.href, '_blank'); return false;">
+                        Help
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -138,6 +143,10 @@ new class extends Component
                         <x-slot name="content">
                             <x-dropdown-link :href="route('profile')" wire:navigate>
                                 {{ __('Profile') }}
+                            </x-dropdown-link>
+
+                            <x-dropdown-link :href="route('help')" target="_blank" onclick="window.open(this.href, '_blank'); return false;">
+                                Help with errors
                             </x-dropdown-link>
 
                             <!-- Authentication -->
@@ -196,6 +205,10 @@ new class extends Component
                     {{ __('Dashboard') }}
                 </x-responsive-nav-link>
             @endif
+
+            <x-responsive-nav-link :href="route('help')" target="_blank" onclick="window.open(this.href, '_blank'); return false;">
+                Help
+            </x-responsive-nav-link>
         </div>
 
         <!-- Responsive Settings Options -->

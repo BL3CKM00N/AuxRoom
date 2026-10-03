@@ -101,4 +101,41 @@ class ErrorPagesAndLinksTest extends TestCase
             ->assertSee('Page errors')->assertSee('Scanning a QR code')->assertSee('Joining a room')
             ->assertSee('id="http-500"', false)->assertSee('id="net-offline"', false);
     }
+
+    private function helpLinks(string $html): int
+    {
+        return substr_count($html, 'href="'.route('help').'"');
+    }
+
+    public function test_help_is_in_every_logged_in_menu(): void
+    {
+        $host = User::factory()->create();
+        $room = Room::create(['invite_code' => 'AAAAAA-BBBBBB-CCCCCC', 'host_id' => $host->id, 'playback_provider_id' => $host->id]);
+        app(\App\Services\RoomMembership::class)->joinAsHost($room);
+
+        $dashboard = $this->actingAs($host)->get(route('dashboard'))->assertOk()->getContent();
+        $this->assertGreaterThanOrEqual(3, $this->helpLinks($dashboard), 'top bar, account menu and phone menu');
+        $this->assertStringContainsString('Help with errors', $dashboard);
+
+        foreach ([route('profile'), route('rooms.create')] as $url) {
+            // A host with an open room is bounced from the creation page; a fresh account is not.
+            $other = User::factory()->create();
+            $html = $this->actingAs($other)->get($url)->assertOk()->getContent();
+            $this->assertGreaterThanOrEqual(3, $this->helpLinks($html), "{$url} has the Help links");
+        }
+    }
+
+    public function test_guests_in_a_room_can_reach_help_from_the_top_bar_and_the_phone_menu(): void
+    {
+        $host = User::factory()->create();
+        $room = Room::create(['invite_code' => 'AAAAAA-BBBBBB-CCCCCC', 'host_id' => $host->id, 'playback_provider_id' => $host->id]);
+        app(\App\Services\RoomMembership::class)->joinAsHost($room);
+        ['guest_token' => $token] = app(\App\Services\RoomMembership::class)->joinAsGuest($room, 'Sam');
+
+        $html = $this->withCookie(\App\Services\RoomMembership::cookieName($room), $token)
+            ->get(route('rooms.show', $room));
+        $html = $html->assertOk()->getContent();
+
+        $this->assertGreaterThanOrEqual(2, $this->helpLinks($html));
+    }
 }
