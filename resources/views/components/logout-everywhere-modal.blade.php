@@ -1,6 +1,6 @@
 @props(['name' => 'logout-everywhere', 'count' => 1, 'hasRoom' => false])
-{{-- Confirmation for "Log out on all devices". The including Livewire component
-     provides logoutEverywhere() and fills $count just before the modal opens. --}}
+{{-- Confirmation for "Log out on all devices" (on the Profile page). The including Livewire
+     component provides logoutEverywhere() and fills $count just before the modal opens. --}}
 <x-modal :name="$name" maxWidth="md" centered>
     <div class="p-6">
         <h2 class="text-lg font-semibold text-aux-text">Log out on all devices?</h2>

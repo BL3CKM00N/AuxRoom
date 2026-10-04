@@ -1,12 +1,13 @@
 <?php
 
-use App\Livewire\Concerns\LogsOutEverywhere;
+use App\Livewire\Actions\Logout;
 use App\Services\Auth\UserSessions;
 use Livewire\Volt\Component;
 
 new class extends Component
 {
-    use LogsOutEverywhere;
+    /** Filled just before the "log out everywhere" confirmation opens. */
+    public int $deviceCount = 1;
 
     public function with(UserSessions $sessions): array
     {
@@ -16,6 +17,19 @@ new class extends Component
             'devices' => $sessions->devices($user, session()->getId()),
             'hasRoom' => (bool) $user->activeHostedRoom(),
         ];
+    }
+
+    public function prepareLogoutEverywhere(UserSessions $sessions): void
+    {
+        $this->deviceCount = max(1, $sessions->live(auth()->user())->count());
+    }
+
+    /** Ends every login, closes the room and goes to the home page, which says what happened. */
+    public function logoutEverywhere(Logout $logout): void
+    {
+        $logout->everywhere();
+
+        $this->redirect('/', navigate: true);
     }
 
     /** Signs one other device out. Never this one (that is the normal Log Out) and never another account's. */
@@ -66,11 +80,19 @@ new class extends Component
         @endforelse
     </ul>
 
-    <button type="button"
-            x-data x-on:click="$wire.prepareLogoutEverywhere().then(() => $dispatch('open-modal', 'logout-everywhere-profile'))"
-            class="px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/20">
-        Log out on all devices
-    </button>
+    <div class="flex flex-wrap gap-3">
+        {{-- These two live here, not in the menus: they are occasional account actions. --}}
+        <a href="{{ route('account.link-device') }}" wire:navigate
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-aux-border text-sm font-medium hover:bg-white/5">
+            <x-icon name="qr" class="w-4 h-4" /> Log in another device
+        </a>
+
+        <button type="button"
+                x-data x-on:click="$wire.prepareLogoutEverywhere().then(() => $dispatch('open-modal', 'logout-everywhere-profile'))"
+                class="px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/20">
+            Log out on all devices
+        </button>
+    </div>
 
     <x-logout-everywhere-modal name="logout-everywhere-profile" :count="$deviceCount" :has-room="$hasRoom" />
 </section>

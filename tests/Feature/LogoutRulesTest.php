@@ -146,21 +146,26 @@ class LogoutRulesTest extends TestCase
         $this->assertSame('Logged out on all 2 devices.', session('status'));
     }
 
-    public function test_the_menu_buttons_run_the_same_rules(): void
+    public function test_the_menu_logout_follows_the_last_login_rule(): void
     {
         [$host, $room] = $this->host();
         $this->loginRow($host, 'other-device-session-0000000000000000000001');
 
         Volt::actingAs($host)->test('layout.navigation')->call('logout');
+
         $this->assertNull($room->refresh()->closed_at, 'another device is still signed in');
+    }
 
-        [$host2, $room2] = [User::factory()->create(), null];
-        $room2 = Room::create(['invite_code' => 'DDDDDD-EEEEEE-FFFFFF', 'host_id' => $host2->id, 'playback_provider_id' => $host2->id]);
-        $this->loginRow($host2, 'second-hosts-phone-0000000000000000000001');
+    public function test_the_profile_page_button_signs_out_everywhere_and_closes_the_room(): void
+    {
+        $host = User::factory()->create();
+        $room = Room::create(['invite_code' => 'DDDDDD-EEEEEE-FFFFFF', 'host_id' => $host->id, 'playback_provider_id' => $host->id]);
+        $this->loginRow($host, 'second-hosts-phone-0000000000000000000001');
 
-        Volt::actingAs($host2)->test('layout.navigation')->call('logoutEverywhere');
-        $this->assertNotNull($room2->refresh()->closed_at);
-        $this->assertSame(0, DB::table('sessions')->where('user_id', $host2->id)->count());
+        Volt::actingAs($host)->test('profile.signed-in-devices')->call('logoutEverywhere');
+
+        $this->assertNotNull($room->refresh()->closed_at);
+        $this->assertSame(0, DB::table('sessions')->where('user_id', $host->id)->count());
     }
 
     public function test_the_confirmation_counts_the_devices_before_it_opens(): void
@@ -169,7 +174,7 @@ class LogoutRulesTest extends TestCase
         $this->loginRow($user, 'one-session-0000000000000000000000000000001');
         $this->loginRow($user, 'two-session-0000000000000000000000000000001');
 
-        Volt::actingAs($user)->test('layout.navigation')->call('prepareLogoutEverywhere')->assertSet('deviceCount', 2);
+        Volt::actingAs($user)->test('profile.signed-in-devices')->call('prepareLogoutEverywhere')->assertSet('deviceCount', 2);
     }
 
     public function test_deleting_the_account_ends_every_login_and_takes_the_room_with_it(): void

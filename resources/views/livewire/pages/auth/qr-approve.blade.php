@@ -112,7 +112,7 @@ new #[Layout('layouts.guest')] class extends Component
     @guest
         <p class="mt-3 text-sm text-aux-muted">
             To log in the other device, approve it from a phone where you're already logged in to AuxRoom:
-            open the AuxRoom menu, choose <span class="font-semibold text-aux-text">Log in another device</span>, and scan the code again.
+            open <span class="font-semibold text-aux-text">Profile</span>, choose <span class="font-semibold text-aux-text">Log in another device</span>, and scan the code again.
         </p>
         <a href="{{ route('login') }}" class="mt-5 inline-flex px-4 py-2 rounded-full bg-aux-accent text-black text-sm font-semibold">Log in on this device instead</a>
     @else

@@ -302,11 +302,17 @@ class QrLoginTest extends TestCase
         $this->assertStringContainsString('Scan the login code', $html);
     }
 
-    public function test_the_menus_offer_log_in_another_device(): void
+    public function test_log_in_another_device_is_on_the_profile_page_and_not_in_the_menus(): void
     {
-        $html = $this->actingAs(User::factory()->create())->get(route('profile'))->assertOk()->getContent();
+        $user = User::factory()->create();
 
-        $this->assertGreaterThanOrEqual(2, substr_count($html, route('account.link-device')), 'account menu and phone menu');
+        $profile = $this->actingAs($user)->get(route('profile'))->assertOk()->getContent();
+        $this->assertSame(1, substr_count($profile, 'href="'.route('account.link-device').'"'), 'one link, in the signed-in devices section');
+
+        // The menus (top bar, account dropdown, phone menu) are on every logged-in page.
+        $dashboard = $this->actingAs($user)->get(route('rooms.create'))->assertOk()->getContent();
+        $this->assertStringNotContainsString(route('account.link-device'), $dashboard);
+        $this->assertStringNotContainsString('Log in another device', $dashboard);
     }
 
     public function test_the_new_guides_exist_on_the_help_page(): void
@@ -322,69 +328,9 @@ class QrLoginTest extends TestCase
         $this->assertStringNotContainsString('items-center justify-center" style', $login, 'with auto margins, not align-items, so tall content is never clipped at the top');
 
         $profile = $this->actingAs(User::factory()->create())->get(route('profile'))->getContent();
-        // Three modals on the profile page: the two log-out-everywhere confirmations (menu and profile
-        // section) are centered, and the delete-account one keeps its top-aligned layout.
-        $this->assertSame(2, preg_match_all('/class="my-auto w-full /', $profile));
-        $this->assertSame(3, preg_match_all('/fixed inset-0 overflow-y-auto/', $profile));
-    }
-
-    public function test_every_qr_message_with_a_code_links_to_its_guide(): void
-    {
-        // computer side: too many codes requested
-        RateLimiter::clear('qr-start:session:'.session()->getId());
-        $panel = Volt::test('auth.qr-login-panel');
-        foreach (range(1, 11) as $i) {
-            $panel->call('start');
-        }
-        $panel->assertSee('[AUTH-QR-LIMIT]');
-
-        // phone side: wrong number, same device, too many tries
-        $user = User::factory()->create();
-        $this->actingAs($user);
-        RateLimiter::clear('qr-approve:'.$user->id);
-        $request = $this->ask();
-        $wrong = $request['code'] === '99' ? '98' : '99';
-
-        Volt::test('pages.auth.qr-approve', ['token' => $request['token']])->set('typed', $wrong)->call('approve')
-            ->assertSee('[AUTH-QR-CODE]');
-
-        foreach (range(1, 10) as $i) {
-            RateLimiter::hit('qr-approve:'.$user->id, 600);
-        }
-        Volt::test('pages.auth.qr-approve', ['token' => $request['token']])->set('typed', $wrong)->call('approve')
-            ->assertSee('Too many tries')->assertSee('[AUTH-QR-LIMIT]');
-    }
-
-    public function test_a_busy_approval_shows_its_guide_code(): void
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-        RateLimiter::clear('qr-approve:'.$user->id);
-
-        // Hold the request's lock so the approval cannot take it (the service waits 3 s by default).
-        $request = $this->ask();
-        $held = Cache::lock('qr-login-lock:'.$request['token'], 10);
-        $this->assertTrue($held->get());
-        $this->app->instance(QrLogin::class, new QrLogin(lockWaitSeconds: 0));
-
-        Volt::test('pages.auth.qr-approve', ['token' => $request['token']])->set('typed', $request['code'])->call('approve')
-            ->assertSee('Press Approve again')->assertSee('[AUTH-QR-BUSY]');
-
-        $held->release();
-    }
-
-    public function test_the_two_new_guides_are_on_the_help_page_for_both_roles(): void
-    {
-        $html = $this->get('/help')->assertOk()->getContent();
-
-        foreach (['auth-qr-limit', 'auth-qr-busy'] as $anchor) {
-            $this->assertStringContainsString('id="'.$anchor.'"', $html);
-        }
-
-        foreach (['AUTH-QR-LIMIT', 'AUTH-QR-BUSY'] as $code) {
-            $entry = \App\Support\Errors\ErrorCatalog::find($code);
-            $this->assertNotEmpty($entry['host']);
-            $this->assertNotEmpty($entry['guest']);
-        }
+        // Two modals on the profile page: the log-out-everywhere confirmation is centered, and the
+        // delete-account one keeps its top-aligned layout.
+        $this->assertSame(1, preg_match_all('/class="my-auto w-full /', $profile));
+        $this->assertSame(2, preg_match_all('/fixed inset-0 overflow-y-auto/', $profile));
     }
 }

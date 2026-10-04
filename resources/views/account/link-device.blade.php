@@ -7,7 +7,7 @@
         <div class="max-w-xl mx-auto px-4 sm:px-6">
             <div class="p-6 bg-aux-card shadow sm:rounded-lg">
                 <ol class="list-decimal pl-5 space-y-2 text-sm text-aux-muted">
-                    <li>On the other device, open AuxRoom's login page and press <span class="font-semibold text-aux-text">Log in with your phone</span>.</li>
+                    <li>On the other device, open AuxRoom's login page and press <span class="font-semibold text-aux-text">Log in with QR</span>.</li>
                     <li>Scan the QR code it shows with the button below.</li>
                     <li>Type the number shown on that screen and approve.</li>
                 </ol>

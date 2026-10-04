@@ -135,7 +135,7 @@ new class extends Component
                 <div class="mt-4 inline-block p-3 bg-white rounded-xl">{!! $svg !!}</div>
 
                 <p class="mt-4 text-sm text-aux-muted">
-                    On your phone, open the AuxRoom menu, choose <span class="font-semibold text-aux-text">Log in another device</span>, scan this code and type the number:
+                    On your phone, open <span class="font-semibold text-aux-text">Profile</span>, choose <span class="font-semibold text-aux-text">Log in another device</span>, scan this code and type the number:
                 </p>
                 <p class="mt-2 text-4xl font-bold tracking-widest text-aux-text" aria-label="Number to type on your phone">{{ $code }}</p>
                 <p class="mt-3 text-xs text-aux-faint">Valid for 2 minutes. Only approve this on your phone if you started it yourself.</p>

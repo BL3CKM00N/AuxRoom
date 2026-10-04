@@ -158,15 +158,17 @@ class ReviewFixesTest extends TestCase
         $this->assertCount(0, $sessions->live($user));
     }
 
-    public function test_both_menus_share_one_log_out_everywhere_implementation(): void
+    public function test_the_menus_carry_neither_account_action_and_the_profile_page_owns_both(): void
     {
         $nav = file_get_contents(resource_path('views/livewire/layout/navigation.blade.php'));
         $devices = file_get_contents(resource_path('views/livewire/profile/signed-in-devices.blade.php'));
 
-        foreach ([$nav, $devices] as $component) {
-            $this->assertStringContainsString('use LogsOutEverywhere;', $component);
-            $this->assertStringNotContainsString('public function logoutEverywhere', $component, 'it lives in the trait only');
+        foreach (['Log in another device', 'Log out on all devices', 'logoutEverywhere', 'logout-everywhere'] as $text) {
+            $this->assertStringNotContainsString($text, $nav, "the menus no longer mention: {$text}");
         }
+
+        $this->assertStringContainsString('public function logoutEverywhere', $devices);
+        $this->assertStringContainsString('account.link-device', $devices);
     }
 
     public function test_the_home_page_shows_the_logout_notice_and_the_login_page_the_signed_out_reason(): void
