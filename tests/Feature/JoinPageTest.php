@@ -15,7 +15,7 @@ class JoinPageTest extends TestCase
         $html = $this->get('/join')->assertOk()->getContent();
 
         $this->assertStringContainsString('Scan QR code', $html);
-        $this->assertStringContainsString("qrScanner('invite_code', 'name')", $html);
+        $this->assertStringContainsString("qrScanner('invite_code', 'name', 'invite')", $html);
         $this->assertStringContainsString('id="invite_code"', $html);
     }
 

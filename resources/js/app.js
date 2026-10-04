@@ -84,3 +84,20 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 });
+
+
+/**
+ * A device the account signed out remotely answers an open tab's refresh with
+ * a 401 (see ShowRevokedSessionNotice). Go to the login page, which shows why,
+ * instead of Livewire's generic error dialog.
+ */
+document.addEventListener('livewire:init', () => {
+    window.Livewire.hook('request', ({ fail }) => {
+        fail(({ status, preventDefault }) => {
+            if (status === 401) {
+                preventDefault();
+                window.location.assign('/login');
+            }
+        });
+    });
+});

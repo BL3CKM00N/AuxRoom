@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Actions\Logout;
+use App\Livewire\Concerns\LogsOutEverywhere;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
@@ -8,6 +9,8 @@ use Livewire\Volt\Component;
 
 new class extends Component
 {
+    use LogsOutEverywhere;
+
     /**
      * Passed only for an anonymous guest viewing a room — guests aren't
      * authenticated, so there's no auth()->user() to derive a "hosted
@@ -145,6 +148,10 @@ new class extends Component
                                 {{ __('Profile') }}
                             </x-dropdown-link>
 
+                            <x-dropdown-link :href="route('account.link-device')" wire:navigate>
+                                Log in another device
+                            </x-dropdown-link>
+
                             <x-dropdown-link :href="route('help')" target="_blank" onclick="window.open(this.href, '_blank'); return false;">
                                 Help with errors
                             </x-dropdown-link>
@@ -153,6 +160,11 @@ new class extends Component
                             <button wire:click="logout" class="w-full text-start">
                                 <x-dropdown-link>
                                     {{ __('Log Out') }}
+                                </x-dropdown-link>
+                            </button>
+                            <button type="button" x-on:click="$wire.prepareLogoutEverywhere().then(() => $dispatch('open-modal', 'logout-everywhere'))" class="w-full text-start">
+                                <x-dropdown-link>
+                                    Log out on all devices
                                 </x-dropdown-link>
                             </button>
                         </x-slot>
@@ -237,14 +249,27 @@ new class extends Component
                         {{ __('Profile') }}
                     </x-responsive-nav-link>
 
+                    <x-responsive-nav-link :href="route('account.link-device')" wire:navigate>
+                        Log in another device
+                    </x-responsive-nav-link>
+
                     <!-- Authentication -->
                     <button wire:click="logout" class="w-full text-start">
                         <x-responsive-nav-link>
                             {{ __('Log Out') }}
                         </x-responsive-nav-link>
                     </button>
+                    <button type="button" x-on:click="open = false; $wire.prepareLogoutEverywhere().then(() => $dispatch('open-modal', 'logout-everywhere'))" class="w-full text-start">
+                        <x-responsive-nav-link>
+                            Log out on all devices
+                        </x-responsive-nav-link>
+                    </button>
                 </div>
             @endif
         </div>
     </div>
+
+    @auth
+        <x-logout-everywhere-modal :count="$deviceCount" :has-room="(bool) ($hostedRoom ?? false)" />
+    @endauth
 </nav>

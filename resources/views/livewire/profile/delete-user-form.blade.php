@@ -17,7 +17,12 @@ new class extends Component
             'password' => ['required', 'string', 'current_password'],
         ]);
 
-        tap(Auth::user(), $logout(...))->delete();
+        $user = Auth::user();
+
+        // Deleting the account ends every login it has, and closes its room.
+        $logout->everywhere();
+
+        $user->delete();
 
         $this->redirect('/', navigate: true);
     }

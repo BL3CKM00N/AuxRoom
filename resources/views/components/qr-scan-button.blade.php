@@ -1,4 +1,4 @@
-@props(['target', 'next' => null])
+@props(['target' => '', 'next' => null, 'mode' => 'invite', 'label' => 'Scan QR code', 'hint' => "Point your camera at the QR code on the host's screen"])
 {{-- Scans a room's QR code with the device camera and fills the invite code
      field, instead of typing 18 characters by hand. Hidden where the browser
      has no camera API. See resources/js/alpine/qr-scanner.js for why this is
@@ -11,11 +11,11 @@
      - The dimmed area around the viewfinder is plain panels, not a
        `box-shadow: 0 0 0 9999px` cutout. That's a ~20,000px layer, past iOS's
        GPU texture limits, and a known way to get a black screen. --}}
-<div x-data="qrScanner('{{ $target }}', @js($next))" x-show="supported" x-cloak
+<div x-data="qrScanner('{{ $target }}', @js($next), @js($mode))" x-show="supported" x-cloak
      @keydown.escape.window="open && close()" @pagehide.window="close()">
     <button type="button" @click="start()"
             class="w-full inline-flex items-center justify-center gap-2 py-2 rounded-full border border-aux-border text-sm font-medium text-aux-text hover:bg-aux-card-hover">
-        <x-icon name="qr" class="w-4 h-4" /> Scan QR code
+        <x-icon name="qr" class="w-4 h-4" /> {{ $label }}
     </button>
 
     <template x-teleport="body">
@@ -66,7 +66,7 @@
 
             <div class="px-6 py-5 text-center min-h-[4.5rem]">
                 <p class="text-sm text-white/80" x-show="status === 'starting'">Starting camera&hellip;</p>
-                <p class="text-sm text-white/80" x-show="status === 'scanning' && !notice">Point your camera at the QR code on the host's screen</p>
+                <p class="text-sm text-white/80" x-show="status === 'scanning' && !notice">{{ $hint }}</p>
                 <p class="text-sm text-amber-300" x-show="notice" x-text="notice"></p>
             </div>
         </div>

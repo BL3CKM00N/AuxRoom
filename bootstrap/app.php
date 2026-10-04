@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // A short reference on every request: in the logs, and on error pages.
         $middleware->append(\App\Http\Middleware\AssignRequestRef::class);
+
+        // Tells a device that was signed out remotely why, instead of an unexplained login screen.
+        $middleware->web(append: [\App\Http\Middleware\ShowRevokedSessionNotice::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

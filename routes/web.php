@@ -9,10 +9,17 @@ use App\Http\Controllers\SpotifyConnectionController;
 use App\Livewire\Dashboard\PartyScreen;
 use App\Livewire\Dashboard\ShowRoom;
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 Route::get('/', HomeController::class);
 
 Route::get('/help', HelpController::class)->name('help');
+
+// Approving a login on another device. Open to anyone (a logged-out phone gets an explanation); the
+// approving itself needs an account, and is limited. See App\Services\Auth\QrLogin.
+Volt::route('/qr-login/{token}', 'pages.auth.qr-approve')
+    ->middleware('throttle:30,1')
+    ->name('qr-login.show');
 
 Route::get('/join', [JoinController::class, 'create'])->name('join');
 // Throttled because every successful submit creates a guest member row.
@@ -34,6 +41,8 @@ Route::view('profile', 'profile')
     ->name('profile');
 
 Route::middleware(['auth'])->group(function () {
+    Route::view('/account/link-device', 'account.link-device')->name('account.link-device');
+
     Route::post('/spotify/connect', [SpotifyConnectionController::class, 'connect'])->name('spotify.connect');
     Route::get('/spotify/callback', [SpotifyConnectionController::class, 'callback'])->name('spotify.callback');
     Route::delete('/spotify', [SpotifyConnectionController::class, 'disconnect'])->name('spotify.disconnect');

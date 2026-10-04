@@ -28,6 +28,12 @@
                  over after the header, the header's few pixels don't need to
                  be accounted for. Back to a normal flow item at lg, where the
                  hero has room to breathe either way. --}}
+            @if (session('status'))
+                <div class="fixed top-20 inset-x-0 z-30 flex justify-center px-4 pointer-events-none">
+                    <div class="pointer-events-auto max-w-md px-4 py-2.5 rounded-lg bg-aux-card border border-aux-border text-sm text-aux-text shadow-xl" role="status">{{ session('status') }}</div>
+                </div>
+            @endif
+
             <header class="fixed top-0 inset-x-0 z-20 lg:relative lg:z-10 max-w-5xl mx-auto w-full px-6 py-8 flex items-center justify-between">
                 <a href="/" class="flex items-center">
                     <x-logo class="h-6" />

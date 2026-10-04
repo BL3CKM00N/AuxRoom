@@ -10,6 +10,15 @@ export function extractInviteCode(text) {
     return match ? match[0].toUpperCase() : null;
 }
 
+// A login code from another device's login page: the one-time token in its approval link.
+const LOGIN_TOKEN = /qr-login\/([A-Za-z0-9]{40})/;
+
+export function extractLoginToken(text) {
+    const match = String(text ?? '').match(LOGIN_TOKEN);
+
+    return match ? match[1] : null;
+}
+
 // Long side, in pixels, of the frame handed to the decoder. Big enough that a
 // QR on a monitor across the room is still resolvable, small enough to
 // decode several times a second on a phone.
@@ -32,7 +41,7 @@ document.addEventListener('alpine:init', () => {
     // inside anything clipped, blended or animated), while drawing the very
     // same frames to a canvas works. The video stays in the DOM, playing,
     // purely as the frame source.
-    Alpine.data('qrScanner', (targetId, nextFocusId = null) => ({
+    Alpine.data('qrScanner', (targetId, nextFocusId = null, mode = 'invite') => ({
         open: false,
         // idle | starting | scanning | denied | unavailable | nopicture | error
         status: 'idle',
@@ -260,6 +269,23 @@ document.addEventListener('alpine:init', () => {
             const result = this.decode(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
 
             if (!result) {
+                return;
+            }
+
+            // Login mode: the code is another device's login request, and scanning it
+            // goes to the page where it is approved (which asks for the number).
+            if (mode === 'login') {
+                const token = extractLoginToken(result.data);
+
+                if (token) {
+                    this.close();
+                    window.location.assign('/qr-login/' + token);
+
+                    return;
+                }
+
+                this.notice = "That QR code isn't an AuxRoom login code.";
+
                 return;
             }
 

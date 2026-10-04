@@ -21,6 +21,12 @@
 
             <div class="p-4 sm:p-8 bg-aux-card shadow sm:rounded-lg">
                 <div class="max-w-xl">
+                    <livewire:profile.signed-in-devices />
+                </div>
+            </div>
+
+            <div class="p-4 sm:p-8 bg-aux-card shadow sm:rounded-lg">
+                <div class="max-w-xl">
                     <livewire:profile.delete-user-form />
                 </div>
             </div>
