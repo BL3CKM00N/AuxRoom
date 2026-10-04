@@ -176,7 +176,7 @@ class QrLoginTest extends TestCase
         $component = Volt::test('auth.qr-login-panel')->call('start');
         Cache::forget('qr-login:'.$component->get('token'));
 
-        $component->call('check')->assertSet('state', 'expired')->assertSee('Show a new code');
+        $component->call('check')->assertSet('state', 'expired')->assertSee('Start again');
 
         $component->call('start')->assertSet('state', 'pending');
     }

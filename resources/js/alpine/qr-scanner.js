@@ -272,6 +272,23 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            // Token mode: the page wants the login code itself (the login page claiming a code a
+            // logged-in computer is showing), so it is handed over as an event, not navigated to.
+            if (mode === 'token') {
+                const token = extractLoginToken(result.data);
+
+                if (token) {
+                    this.close();
+                    window.dispatchEvent(new CustomEvent('qr-token-scanned', { detail: { token } }));
+
+                    return;
+                }
+
+                this.notice = "That QR code isn't an AuxRoom login code.";
+
+                return;
+            }
+
             // Login mode: the code is another device's login request, and scanning it
             // goes to the page where it is approved (which asks for the number).
             if (mode === 'login') {
