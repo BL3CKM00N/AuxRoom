@@ -145,10 +145,6 @@ new class extends Component
                                 {{ __('Profile') }}
                             </x-dropdown-link>
 
-                            <x-dropdown-link :href="route('help')" target="_blank" onclick="window.open(this.href, '_blank'); return false;">
-                                Help with errors
-                            </x-dropdown-link>
-
                             <!-- Authentication -->
                             <button wire:click="logout" class="w-full text-start">
                                 <x-dropdown-link>

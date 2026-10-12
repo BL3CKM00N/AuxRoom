@@ -114,14 +114,14 @@ class ErrorPagesAndLinksTest extends TestCase
         app(\App\Services\RoomMembership::class)->joinAsHost($room);
 
         $dashboard = $this->actingAs($host)->get(route('dashboard'))->assertOk()->getContent();
-        $this->assertGreaterThanOrEqual(3, $this->helpLinks($dashboard), 'top bar, account menu and phone menu');
-        $this->assertStringContainsString('Help with errors', $dashboard);
+        $this->assertGreaterThanOrEqual(2, $this->helpLinks($dashboard), 'top bar and phone menu');
+        $this->assertStringNotContainsString('Help with errors', $dashboard, 'one Help link per menu, not two');
 
         foreach ([route('profile'), route('rooms.create')] as $url) {
             // A host with an open room is bounced from the creation page; a fresh account is not.
             $other = User::factory()->create();
             $html = $this->actingAs($other)->get($url)->assertOk()->getContent();
-            $this->assertGreaterThanOrEqual(3, $this->helpLinks($html), "{$url} has the Help links");
+            $this->assertGreaterThanOrEqual(2, $this->helpLinks($html), "{$url} has the Help links");
         }
     }
 
