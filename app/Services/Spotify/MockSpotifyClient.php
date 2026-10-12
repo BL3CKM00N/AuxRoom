@@ -74,12 +74,17 @@ class MockSpotifyClient implements SpotifyClientContract
         return true;
     }
 
-    public function getQueue(): array
+    public function getQueue(bool $fresh = false): array
     {
         return [];
     }
 
     public function getProfile(): ?array
+    {
+        return null;
+    }
+
+    public function peekContextTrackIds(string $contextUri): ?array
     {
         return null;
     }

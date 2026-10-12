@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Services\Spotify\SpotifyClientFactory;
+use App\Services\Spotify\WatchState;
 
 /**
  * "Is this room on the mock client, and what Spotify Connect devices are
@@ -35,6 +36,12 @@ trait ResolvesSpotifyDevices
 
         if (! $this->room->playbackProvider?->hasSpotifyConnected()) {
             return [];
+        }
+
+        // The watcher keeps the device list; a render does not ask Spotify when it can use that.
+        if (WatchState::watcherAlive()) {
+            return WatchState::devices($this->room)
+                ?? tap(app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices(allowCached: true), fn ($d) => WatchState::putDevices($this->room, $d));
         }
 
         return app(SpotifyClientFactory::class)->forRoom($this->room)->getDevices(allowCached: true);

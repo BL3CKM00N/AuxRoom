@@ -38,16 +38,24 @@ class PlaybackSync
             return;
         }
 
-        $client = $this->clients->forRoom($room);
-
         try {
-            $state = $client->getPlaybackState();
+            $state = $this->clients->forRoom($room)->getPlaybackState();
         } catch (SpotifyRequestFailed) {
             // An outage or rate limit says nothing about what's playing, so
             // leave the room's last known state alone rather than clearing it.
             return;
         }
 
+        $this->applyState($room, $state, $actingMemberId);
+    }
+
+    /**
+     * Brings the room in line with a playback state Spotify just reported (null: nothing
+     * active). Split from sync() so the background watcher, which decides when an answer
+     * can be trusted (see RoomWatcher), can apply exactly the state it chose.
+     */
+    public function applyState(Room $room, ?array $state, ?int $actingMemberId = null): void
+    {
         if (! $state) {
             $this->markInactive($room);
 

@@ -79,6 +79,15 @@ class Room extends Model
                 $room->playback_inactive_at = null;
             }
         });
+
+        // Every local command stamps last_local_command_at. That tells the background watcher to
+        // poll fast for a moment and not to trust a read that still shows the state from before
+        // the command (the specific commands narrow this down, see HandlesPlayback).
+        static::saved(function (Room $room) {
+            if ($room->wasChanged('last_local_command_at') && $room->last_local_command_at) {
+                \App\Services\Spotify\WatchState::expect($room, 'other', $room->now_playing_track_id);
+            }
+        });
     }
 
     public function getRouteKeyName(): string

@@ -38,12 +38,22 @@ class UpcomingQueue
 
         $client = $this->clients->forRoom($room);
         $context = $room->now_playing_context_uri;
+
+        // With the watcher running, the queue and playlist order come from what it last read, so
+        // rendering a page never waits on Spotify. The first render of a room, before the watcher
+        // has looked, asks once and stores the answer.
+        $watched = WatchState::watcherAlive();
+
+        $queue = $watched
+            ? (WatchState::queue($room) ?? tap($client->getQueue(), fn ($q) => WatchState::putQueue($room, $q)))
+            : $client->getQueue();
+
         $contextIds = $room->repeat_mode !== 'track' && Room::isPlayableContext($context)
-            ? $client->getContextTrackIds($context)
+            ? ($watched ? ($client->peekContextTrackIds($context) ?? $client->getContextTrackIds($context)) : $client->getContextTrackIds($context))
             : null;
 
         return self::trim(
-            $client->getQueue(),
+            $queue,
             $room->now_playing_track_id,
             $room->repeat_mode ?: 'off',
             $contextIds,

@@ -307,11 +307,11 @@ class SpotifyWebApiClient implements SpotifyClientContract
         return (bool) $response?->successful();
     }
 
-    public function getQueue(): array
+    public function getQueue(bool $fresh = false): array
     {
         $key = $this->cacheKey('queue');
 
-        if (is_array($cached = Cache::get($key))) {
+        if (! $fresh && is_array($cached = Cache::get($key))) {
             return $cached;
         }
 
@@ -357,6 +357,14 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'display_name' => $response->json('display_name'),
             'product' => $response->json('product'),
         ];
+    }
+
+    /** The playlist order if it is already known: never asks Spotify, so a page render can use it. */
+    public function peekContextTrackIds(string $contextUri): ?array
+    {
+        $cached = Cache::get($this->cacheKey("context:{$contextUri}"));
+
+        return is_array($cached) && $cached ? $cached : null;
     }
 
     public function getContextTrackIds(string $contextUri): ?array
@@ -437,7 +445,11 @@ class SpotifyWebApiClient implements SpotifyClientContract
         if (! $response || $response->failed()) {
             Log::warning('Spotify playback state fetch failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
-            throw new SpotifyRequestFailed('Spotify playback state fetch failed with status '.$response->status());
+            throw SpotifyRequestFailed::withStatus(
+                'Spotify playback state fetch failed with status '.$response->status(),
+                $response->status(),
+                $response->header('Retry-After') !== '' ? (int) $response->header('Retry-After') : null,
+            );
         }
 
         $json = $response->json();

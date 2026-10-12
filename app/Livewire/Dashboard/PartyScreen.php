@@ -6,6 +6,7 @@ use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\Room;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\UpcomingQueue;
+use App\Services\Spotify\WatchState;
 use App\Support\SharePreview;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -23,6 +24,7 @@ class PartyScreen extends Component
         abort_if($room->closed_at, 404);
 
         $this->room = $room;
+        WatchState::touch($room);
     }
 
     #[On('echo:room.{room.invite_code},RoomUpdated')]
@@ -38,7 +40,11 @@ class PartyScreen extends Component
         // Independent of the host's own dashboard tab (see PlaybackSync) —
         // without this, a Party Screen left open on its own would never
         // notice a track change at all, not just slowly.
-        if (! $this->room->commandedRecently()) {
+        WatchState::touch($this->room);
+
+        // The background watcher keeps the room true to Spotify when it is running (see RoomWatcher);
+        // this screen only asks Spotify itself when it is not.
+        if (! WatchState::watcherAlive() && ! $this->room->commandedRecently()) {
             app(PlaybackSync::class)->sync($this->room);
         }
     }

@@ -91,7 +91,7 @@ interface SpotifyClientContract
      *
      * @return array<int, array{id: string, uri: string, name: string, artist: string, album_art_url: ?string, duration_ms: int}>
      */
-    public function getQueue(): array;
+    public function getQueue(bool $fresh = false): array;
 
     /**
      * The real, current playback state as Spotify sees it right now — used
@@ -119,4 +119,7 @@ interface SpotifyClientContract
      * @return array<int, string>|null
      */
     public function getContextTrackIds(string $contextUri): ?array;
+
+    /** Like getContextTrackIds() but only from what is already known; never makes a request. */
+    public function peekContextTrackIds(string $contextUri): ?array;
 }

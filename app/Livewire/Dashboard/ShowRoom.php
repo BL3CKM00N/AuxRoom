@@ -17,6 +17,7 @@ use App\Models\RoomMember;
 use App\Services\RoomMembership;
 use App\Services\Spotify\SpotifyCheck;
 use App\Services\Spotify\UpcomingQueue;
+use App\Services\Spotify\WatchState;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -78,6 +79,7 @@ class ShowRoom extends Component
 
         $found->update(['last_seen_at' => now()]);
         $this->memberId = $found->id;
+        WatchState::touch($room);
 
         if (! request()->has('tab')) {
             $this->activeTab = 'queue';
@@ -134,6 +136,7 @@ class ShowRoom extends Component
         }
 
         $this->member->update(['last_seen_at' => now()]);
+        WatchState::touch($this->room);
 
         // Track transitions are detected by polling Spotify's real state
         // (syncWithSpotify) rather than guessing from a local wall-clock
@@ -146,7 +149,8 @@ class ShowRoom extends Component
         // landing right after play/pause/skip can still read the old state
         // and immediately overwrite the correct local one with it — the
         // command visibly "undoing itself" a moment after being pressed.
-        if ($this->isHost && ! $this->room->commandedRecently()) {
+        // The background watcher does this when it is running (see RoomWatcher); this is the fallback.
+        if ($this->isHost && ! WatchState::watcherAlive() && ! $this->room->commandedRecently()) {
             $this->syncWithSpotify();
         }
 

@@ -3,8 +3,10 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Models\QueueItem;
+use App\Services\Spotify\PlaybackPrediction;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\SpotifyClientFactory;
+use App\Services\Spotify\WatchState;
 
 /** Transport controls (play/pause/skip/seek/volume/shuffle/repeat), device selection, and the low-level "start playback" primitives they share. */
 trait HandlesPlayback
@@ -126,6 +128,7 @@ trait HandlesPlayback
             'now_playing_position_ms' => $position,
             'last_local_command_at' => now(),
         ]);
+        WatchState::expect($this->room, 'pause', $this->room->now_playing_track_id);
 
         $this->logActivity('paused', 'Playback paused.');
         $this->broadcastUpdate('playback');
@@ -142,6 +145,12 @@ trait HandlesPlayback
             return;
         }
 
+        $watcherRuns = WatchState::watcherAlive();
+        $fromTrack = $this->room->now_playing_track_id;
+
+        // What a skip will play, worked out before the command: the queue is cleared by it.
+        $predicted = $watcherRuns && PlaybackPrediction::possible($this->room) ? $this->queue->first() : null;
+
         if (! app(SpotifyClientFactory::class)->forRoom($this->room)->skipToNext($this->providerDeviceId())) {
             $this->failCommand('SP-CMD', "Spotify couldn't skip the track.");
 
@@ -149,8 +158,17 @@ trait HandlesPlayback
         }
 
         $this->room->update(['last_local_command_at' => now()]);
+        WatchState::expect($this->room, 'skip', $fromTrack);
         $this->logActivity('skipped', "{$this->member->display_name} skipped the track.");
-        $this->syncWithSpotify();
+
+        if ($predicted) {
+            // Shown at once; the watcher confirms it a moment later and corrects it if Spotify disagrees.
+            app(PlaybackPrediction::class)->apply($this->room, $predicted);
+        } elseif (! $watcherRuns) {
+            // No watcher: ask Spotify right away, as before.
+            $this->syncWithSpotify();
+        }
+
         $this->broadcastUpdate('playback');
     }
 
@@ -167,8 +185,13 @@ trait HandlesPlayback
         }
 
         $this->room->update(['last_local_command_at' => now()]);
+        WatchState::expect($this->room, 'previous', $this->room->now_playing_track_id);
         $this->logActivity('skipped', "{$this->member->display_name} went back a track.");
-        $this->syncWithSpotify();
+
+        if (! WatchState::watcherAlive()) {
+            $this->syncWithSpotify();
+        }
+
         $this->broadcastUpdate('playback');
     }
 
