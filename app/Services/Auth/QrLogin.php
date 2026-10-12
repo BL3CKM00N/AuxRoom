@@ -4,6 +4,7 @@ namespace App\Services\Auth;
 
 use App\Events\QrLoginUpdated;
 use App\Models\User;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -231,14 +232,44 @@ class QrLogin
      * Runs $work while holding this token's lock, so approve and claim cannot
      * interleave. A lock that stays busy gives $busy back (the caller can retry)
      * instead of surfacing a LockTimeoutException as a server error.
+     *
+     * The lock is taken from the default cache store (Redis) and, if that cannot be
+     * reached, from the database: the failover cache protects reads and writes, but a
+     * lock object only fails when it is first used, so the fallback is explicit here.
      */
     private function locked(string $token, mixed $busy, \Closure $work): mixed
     {
-        try {
-            return Cache::lock('qr-login-lock:'.$token, 5)->block($this->lockWaitSeconds, $work);
-        } catch (LockTimeoutException) {
+        $lock = $this->acquire($token);
+
+        if ($lock === null) {
             return $busy;
         }
+
+        try {
+            return $work();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /** @return Lock|null the held lock, or null when it stayed busy for the whole wait */
+    private function acquire(string $token): ?Lock
+    {
+        foreach ([null, 'database'] as $store) {
+            try {
+                $lock = Cache::store($store)->lock('qr-login-lock:'.$token, 5);
+                $lock->block($this->lockWaitSeconds);
+
+                return $lock;
+            } catch (LockTimeoutException) {
+                return null;
+            } catch (\Throwable $e) {
+                // That store cannot be reached; try the next one.
+                report($e);
+            }
+        }
+
+        return null;
     }
 
     /** Checks the typed number. Right: approved. Wrong: counted, and the third cancels the request. */

@@ -97,11 +97,13 @@ return [
             'driver' => 'octane',
         ],
 
+        // Redis first (the Cache service), the database if Redis is unreachable, so a Cache restart
+        // slows things down instead of failing every rate limit, lookup and lock.
         'failover' => [
             'driver' => 'failover',
             'stores' => [
+                'redis',
                 'database',
-                'array',
             ],
         ],
 

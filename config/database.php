@@ -155,6 +155,9 @@ return [
 
         'default' => [
             'url' => env('REDIS_URL'),
+            // Fail fast: with Redis down, the cache fails over to the database instead of stalling requests.
+            'timeout' => env('REDIS_TIMEOUT', 0.5),
+            'read_write_timeout' => env('REDIS_TIMEOUT', 0.5),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -168,6 +171,9 @@ return [
 
         'cache' => [
             'url' => env('REDIS_URL'),
+            // Fail fast: with Redis down, the cache fails over to the database instead of stalling requests.
+            'timeout' => env('REDIS_TIMEOUT', 0.5),
+            'read_write_timeout' => env('REDIS_TIMEOUT', 0.5),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),

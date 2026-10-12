@@ -36,7 +36,15 @@ class ShowRevokedSessionNotice
         }
 
         $id = $session->getId();
-        $note = $this->sessions->note($id);
+
+        try {
+            $note = $this->sessions->note($id);
+        } catch (\Throwable $e) {
+            // The cache is unavailable: showing why a device was signed out is not worth failing the page.
+            report($e);
+
+            return $next($request);
+        }
 
         if (! $note) {
             $session->put(self::CHECKED, true);
