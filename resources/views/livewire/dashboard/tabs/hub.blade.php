@@ -217,6 +217,76 @@
         @endif
     </div>
 
+    {{-- Queue rules: who may add what. Host only; co-hosts get a warning they can override. --}}
+    @if ($this->isHost)
+        <div class="w-full p-5 rounded-xl bg-aux-card border border-aux-border" id="queue-rules">
+            <p class="font-medium text-sm">Queue rules</p>
+            <p class="text-xs text-aux-faint mt-1">Apply to guests when they add songs. You and your co-hosts get a warning with Add anyway. A guest can be exempted in the Guests tab.</p>
+
+            <div class="mt-4 space-y-4">
+                <div>
+                    <p class="text-xs text-aux-muted mb-1.5">Songs waiting per guest</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button wire:click="setQueueLimit(null)" class="px-3 py-1 rounded-full text-xs {{ $room->queue_limit_per_guest === null ? 'bg-aux-accent text-black font-semibold' : 'bg-white/5 text-aux-muted' }}">No limit</button>
+                        @foreach ($this::LIMIT_CHOICES as $n)
+                            <button wire:click="setQueueLimit({{ $n }})" class="px-3 py-1 rounded-full text-xs {{ $room->queue_limit_per_guest === $n ? 'bg-aux-accent text-black font-semibold' : 'bg-white/5 text-aux-muted' }}">{{ $n }}</button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs text-aux-muted mb-1.5">No repeats within the last</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button wire:click="setDuplicateGuard(null)" class="px-3 py-1 rounded-full text-xs {{ $room->duplicate_guard_tracks === null ? 'bg-aux-accent text-black font-semibold' : 'bg-white/5 text-aux-muted' }}">Off</button>
+                        @foreach ($this::DUPLICATE_CHOICES as $n)
+                            <button wire:click="setDuplicateGuard({{ $n }})" class="px-3 py-1 rounded-full text-xs {{ $room->duplicate_guard_tracks === $n ? 'bg-aux-accent text-black font-semibold' : 'bg-white/5 text-aux-muted' }}">{{ $n }} tracks</button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <button wire:click="toggleBlockExplicit" class="w-full flex items-center justify-between gap-3 text-left">
+                    <span class="text-xs text-aux-muted">Block explicit songs <span class="text-aux-faint">(as Spotify labels them)</span></span>
+                    <span class="relative inline-flex h-5 w-9 items-center rounded-full transition shrink-0 {{ $room->block_explicit ? 'bg-aux-accent' : 'bg-white/10' }}">
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition {{ $room->block_explicit ? 'translate-x-[18px]' : 'translate-x-0.5' }}"></span>
+                    </span>
+                </button>
+
+                <div>
+                    <p class="text-xs text-aux-muted mb-1.5">Block list</p>
+                    @if ($room->now_playing_track_id && $this->nowPlaying)
+                        <div class="rounded-lg bg-white/5 p-3 text-xs">
+                            <p class="text-aux-faint">Playing now: <span class="text-aux-text">{{ $this->nowPlaying->name }}</span> by {{ $this->nowPlaying->artist }}</p>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <button wire:click="blockNowPlayingTrack" class="px-3 py-1 rounded-full border border-aux-border hover:bg-aux-card-hover">Block this song</button>
+                                @foreach ($room->now_playing_artists ?? [] as $artist)
+                                    <button wire:click="blockNowPlayingArtist({{ \Illuminate\Support\Js::from($artist['id']) }})" class="px-3 py-1 rounded-full border border-aux-border hover:bg-aux-card-hover">Block {{ $artist['name'] }}</button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    @php($blocked = $room->blockedItems()->orderBy('kind')->orderBy('name')->get())
+                    @if ($blocked->isEmpty())
+                        <p class="mt-2 text-xs text-aux-faint">Nothing is blocked.</p>
+                    @else
+                        <ul class="mt-2 divide-y divide-white/5">
+                            @foreach ($blocked as $item)
+                                <li class="py-2 flex items-center justify-between gap-3">
+                                    <span class="min-w-0 text-xs">
+                                        <span class="px-1.5 py-0.5 rounded bg-white/5 text-[10px] uppercase tracking-wide text-aux-faint">{{ $item->kind }}</span>
+                                        <span class="ml-1 truncate">{{ $item->name }}</span>
+                                        @if ($item->detail)<span class="text-aux-faint"> by {{ $item->detail }}</span>@endif
+                                    </span>
+                                    <button wire:click="unblock({{ $item->id }})" class="text-[11px] text-aux-muted hover:text-aux-text shrink-0">Unblock</button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Room activity: host always sees it; collapsed by default (see the partial) --}}
     <div class="w-full">
         @include('livewire.dashboard.tabs.partials.activity')

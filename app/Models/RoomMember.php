@@ -31,6 +31,7 @@ class RoomMember extends Model
         'can_view_activity',
         'location_verified_at',
         'location_exempt',
+        'queue_rules_exempt',
         'last_seen_at',
         'left_at',
     ];
@@ -47,6 +48,7 @@ class RoomMember extends Model
             'can_view_activity' => 'boolean',
             'location_verified_at' => 'datetime',
             'location_exempt' => 'boolean',
+            'queue_rules_exempt' => 'boolean',
             'last_seen_at' => 'datetime',
             'left_at' => 'datetime',
         ];
@@ -70,6 +72,12 @@ class RoomMember extends Model
     public function isHost(): bool
     {
         return $this->role === 'host';
+    }
+
+    /** The host, or a co-host the host trusted with the same controls. */
+    public function isStaff(): bool
+    {
+        return in_array($this->role, ['host', 'cohost'], true);
     }
 
     public function isApproved(): bool

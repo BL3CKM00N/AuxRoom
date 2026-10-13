@@ -2,6 +2,7 @@
 
 namespace App\Services\Spotify;
 
+use App\Models\PlayedTrack;
 use App\Models\Room;
 
 /**
@@ -26,7 +27,12 @@ class PlaybackPrediction
         $matched = $room->queueItems()->where('spotify_track_id', $next->spotify_track_id)->whereNull('played_at')->first();
         $matched?->update(['played_at' => now()]);
 
+        PlayedTrack::record($room, $next->spotify_track_id);
+
+        // The artists and explicit flag are not known here; the watcher fills them in when it confirms.
         $room->update([
+            'now_playing_artists' => null,
+            'now_playing_explicit' => false,
             'now_playing_queue_item_id' => $matched?->id,
             'now_playing_track_id' => $next->spotify_track_id,
             'now_playing_name' => $next->name,

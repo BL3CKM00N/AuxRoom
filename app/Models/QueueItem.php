@@ -17,12 +17,16 @@ class QueueItem extends Model
         'duration_ms',
         'position',
         'played_at',
+        'artists',
+        'explicit',
     ];
 
     protected function casts(): array
     {
         return [
             'played_at' => 'datetime',
+            'artists' => 'array',
+            'explicit' => 'boolean',
         ];
     }
 

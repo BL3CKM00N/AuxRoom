@@ -4,6 +4,7 @@ namespace App\Services\Spotify;
 
 use App\Events\RoomUpdated;
 use App\Models\ActivityEvent;
+use App\Models\PlayedTrack;
 use App\Models\Room;
 use Illuminate\Support\Carbon;
 
@@ -85,6 +86,10 @@ class PlaybackSync
             $matched?->update(['played_at' => now()]);
             $queueItemId = $matched?->id;
 
+            if (! $finished) {
+                PlayedTrack::record($room, $state['track_id']);
+            }
+
             if (! $isFallbackContext && ! $matched && $state['track_id'] && ! $finished) {
                 ActivityEvent::create([
                     'room_id' => $room->id,
@@ -106,8 +111,10 @@ class PlaybackSync
             || $state['supports_volume'] !== $room->volume_supported;
         $contextChanged = $state['context_uri'] !== $room->now_playing_context_uri;
         $wasInactive = $room->playback_inactive_at !== null;
+        // After a skip prediction the track is right but its artists are not known yet.
+        $detailsMissing = $room->now_playing_artists === null && ! empty($state['artists']);
 
-        if (! $wasInactive && ! $volumeChanged && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
+        if (! $detailsMissing && ! $wasInactive && ! $volumeChanged && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
             return;
         }
 
@@ -117,6 +124,8 @@ class PlaybackSync
             'now_playing_context_uri' => $state['context_uri'],
             'now_playing_name' => $state['name'],
             'now_playing_artist' => $state['artist'],
+            'now_playing_artists' => $state['artists'] ?? [],
+            'now_playing_explicit' => $state['explicit'] ?? false,
             'now_playing_album_art_url' => $state['album_art_url'],
             'now_playing_duration_ms' => $state['duration_ms'],
             'is_playing_fallback' => $isFallbackContext,

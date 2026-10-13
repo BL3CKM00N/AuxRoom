@@ -307,6 +307,23 @@
                            class="w-full pl-9 pr-3 py-2 rounded-full bg-aux-card-hover border border-aux-border text-sm placeholder:text-aux-faint focus:outline-none focus:ring-1 focus:ring-aux-accent disabled:opacity-40 disabled:cursor-not-allowed">
                 </div>
 
+                @if ($ruleWarning)
+                    <div class="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
+                        <p class="text-amber-300">
+                            {{ $ruleWarning['message'] }}
+                            <a href="{{ route('help') }}#{{ strtolower($ruleWarning['code']) }}" target="_blank" class="underline underline-offset-2">[{{ $ruleWarning['code'] }}]</a>
+                        </p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <button type="button" wire:click="addToQueue({{ $ruleWarning['index'] }}, true)" class="px-3 py-1 rounded-full bg-aux-accent text-black text-xs font-semibold">Add anyway</button>
+                            <button type="button" wire:click="dismissRuleWarning" class="px-3 py-1 rounded-full border border-aux-border text-xs">Cancel</button>
+                        </div>
+                    </div>
+                @endif
+
+                @if ($rules = $room->queueRulesSummary())
+                    <p class="mt-2 text-[11px] text-aux-faint">{{ implode(' · ', $rules) }}</p>
+                @endif
+
                 @if (count($searchResults))
                     <p class="mt-4 text-[10px] uppercase tracking-widest text-aux-faint">Search results</p>
                 @endif

@@ -75,6 +75,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'artist' => collect($track['artists'] ?? [])->pluck('name')->join(', '),
             'album_art_url' => $track['album']['images'][0]['url'] ?? null,
             'duration_ms' => $track['duration_ms'],
+            'artists' => collect($track['artists'] ?? [])->filter(fn ($a) => ! empty($a['id']))->map(fn ($a) => ['id' => $a['id'], 'name' => $a['name'] ?? ''])->values()->all(),
+            'explicit' => (bool) ($track['explicit'] ?? false),
         ])->all();
     }
 
@@ -466,6 +468,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
             'device_id' => $json['device']['id'] ?? null,
             'name' => $item['name'] ?? null,
             'artist' => collect($item['artists'] ?? [])->pluck('name')->join(', ') ?: null,
+            'artists' => collect($item['artists'] ?? [])->filter(fn ($a) => ! empty($a['id']))->map(fn ($a) => ['id' => $a['id'], 'name' => $a['name'] ?? ''])->values()->all(),
+            'explicit' => (bool) ($item['explicit'] ?? false),
             'album_art_url' => $item['album']['images'][0]['url'] ?? null,
             'duration_ms' => (int) ($item['duration_ms'] ?? 0),
             'context_uri' => $json['context']['uri'] ?? null,

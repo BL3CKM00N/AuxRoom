@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Models\Room;
+use App\Services\Queue\QueueRules;
 use App\Services\Spotify\SpotifyClientFactory;
 use Livewire\Attributes\Locked;
 
@@ -22,6 +23,15 @@ trait HandlesPlaylistSearch
     #[Locked]
     public array $searchResults = [];
 
+    /**
+     * A queue rule the host or a co-host just ran into: they can still add the song with
+     * addToQueue($index, force: true). Locked, only set by addToQueue().
+     *
+     * @var array{index: int, code: string, message: string}|null
+     */
+    #[Locked]
+    public ?array $ruleWarning = null;
+
     public bool $showPlaylistPicker = false;
 
     public string $playlistQuery = '';
@@ -32,6 +42,8 @@ trait HandlesPlaylistSearch
 
     public function updatedSearch(): void
     {
+        $this->ruleWarning = null;
+
         if (trim($this->search) !== '') {
             $this->activeTab = 'queue';
         }
@@ -56,8 +68,16 @@ trait HandlesPlaylistSearch
         $this->searchResults = app(SpotifyClientFactory::class)->forRoom($this->room)->search($query, 8);
     }
 
-    public function addToQueue(int $index): void
+    public function dismissRuleWarning(): void
     {
+        $this->ruleWarning = null;
+    }
+
+    /** $force only counts for the host and co-hosts: it is the "Add anyway" on a queue-rule warning. */
+    public function addToQueue(int $index, bool $force = false): void
+    {
+        $this->ruleWarning = null;
+
         if (! $this->passesGate('guests_can_add_to_queue')) {
             return;
         }
@@ -66,6 +86,25 @@ trait HandlesPlaylistSearch
 
         if (! $track) {
             return;
+        }
+
+        $broke = app(QueueRules::class)->violation($this->room, $this->member, $track);
+        $overridden = false;
+
+        if ($broke) {
+            if (! $this->canManage) {
+                $this->fail($broke['code'], $broke['message']);
+
+                return;
+            }
+
+            if (! $force) {
+                $this->ruleWarning = ['index' => $index] + $broke;
+
+                return;
+            }
+
+            $overridden = true;
         }
 
         $nextPosition = (int) ($this->room->queueItems()->max('position') ?? 0) + 1;
@@ -78,9 +117,11 @@ trait HandlesPlaylistSearch
             'album_art_url' => $track['album_art_url'],
             'duration_ms' => $track['duration_ms'],
             'position' => $nextPosition,
+            'artists' => $track['artists'] ?? [],
+            'explicit' => (bool) ($track['explicit'] ?? false),
         ]);
 
-        $this->logActivity('queued', "{$this->member->display_name} added \"{$item->name}\" to the queue.");
+        $this->logActivity('queued', "{$this->member->display_name} added \"{$item->name}\" to the queue".($overridden ? ' (past a queue rule).' : '.')); 
 
         if (! $this->room->now_playing_track_id && ! $this->room->is_playing) {
             // Nothing playing at all yet — this is the first song, so start it.

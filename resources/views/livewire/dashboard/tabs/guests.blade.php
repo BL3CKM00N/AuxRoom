@@ -119,6 +119,13 @@
                                     </span>
                                 </button>
                             @endforeach
+                            <button wire:click="setQueueRulesExempt({{ $m->id }}, {{ $m->queue_rules_exempt ? 'false' : 'true' }})"
+                                    class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs {{ $m->queue_rules_exempt ? 'bg-aux-accent-soft text-aux-accent' : 'bg-white/5 text-aux-faint' }}">
+                                Exempt from queue rules
+                                <span class="relative inline-flex h-4 w-7 items-center rounded-full transition shrink-0 {{ $m->queue_rules_exempt ? 'bg-aux-accent' : 'bg-white/10' }}">
+                                    <span class="inline-block h-3 w-3 transform rounded-full bg-white transition {{ $m->queue_rules_exempt ? 'translate-x-3.5' : 'translate-x-0.5' }}"></span>
+                                </span>
+                            </button>
                         </div>
                     @endif
                 </li>

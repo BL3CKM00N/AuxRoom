@@ -42,6 +42,11 @@ class Room extends Model
         'repeat_mode',
         'volume_percent',
         'volume_supported',
+        'queue_limit_per_guest',
+        'duplicate_guard_tracks',
+        'block_explicit',
+        'now_playing_artists',
+        'now_playing_explicit',
     ];
 
     protected function casts(): array
@@ -53,6 +58,9 @@ class Room extends Model
             'shuffle_enabled' => 'boolean',
             'smart_shuffle_enabled' => 'boolean',
             'volume_supported' => 'boolean',
+            'block_explicit' => 'boolean',
+            'now_playing_explicit' => 'boolean',
+            'now_playing_artists' => 'array',
             'location_enforced' => 'boolean',
             'location_lat' => 'float',
             'location_lng' => 'float',
@@ -152,6 +160,11 @@ class Room extends Model
     public function pendingQueueItems(): HasMany
     {
         return $this->queueItems()->whereNull('played_at')->orderBy('position');
+    }
+
+    public function blockedItems(): HasMany
+    {
+        return $this->hasMany(BlockedItem::class);
     }
 
     public function activityEvents(): HasMany
@@ -267,6 +280,35 @@ class Room extends Model
     {
         return $this->last_local_command_at
             && $this->last_local_command_at->diffInSeconds(Carbon::now()) < 4;
+    }
+
+    /**
+     * The queue rules that are on, as short phrases for guests to read ("Up to 3 songs waiting").
+     * The block list is not spelled out; it only says that one exists.
+     *
+     * @return array<int, string>
+     */
+    public function queueRulesSummary(): array
+    {
+        $rules = [];
+
+        if ($this->queue_limit_per_guest) {
+            $rules[] = 'Up to '.$this->queue_limit_per_guest.($this->queue_limit_per_guest === 1 ? ' song' : ' songs').' waiting per person';
+        }
+
+        if ($this->duplicate_guard_tracks) {
+            $rules[] = 'No repeats within '.$this->duplicate_guard_tracks.' tracks';
+        }
+
+        if ($this->block_explicit) {
+            $rules[] = 'No explicit songs';
+        }
+
+        if ($this->blockedItems()->exists()) {
+            $rules[] = 'Some songs and artists are blocked';
+        }
+
+        return $rules;
     }
 
     public function hasLocationBoundary(): bool

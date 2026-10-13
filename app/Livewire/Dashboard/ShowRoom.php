@@ -9,6 +9,7 @@ use App\Livewire\Dashboard\Concerns\HandlesPlayback;
 use App\Livewire\Dashboard\Concerns\HandlesPlaylistSearch;
 use App\Livewire\Dashboard\Concerns\ManagesConfirmModal;
 use App\Livewire\Dashboard\Concerns\ManagesGuestPermissions;
+use App\Livewire\Dashboard\Concerns\ManagesQueueRules;
 use App\Livewire\Dashboard\Concerns\ReportsErrors;
 use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\ActivityEvent;
@@ -31,6 +32,7 @@ class ShowRoom extends Component
     use HandlesPlaylistSearch;
     use ManagesConfirmModal;
     use ManagesGuestPermissions;
+    use ManagesQueueRules;
     use ReportsErrors;
     use ResolvesSpotifyDevices;
 
@@ -186,6 +188,12 @@ class ShowRoom extends Component
     public function getIsHostProperty(): bool
     {
         return $this->member->isHost();
+    }
+
+    /** Host or co-host: can run the room day to day (approve, skip, add past the queue rules). */
+    public function getCanManageProperty(): bool
+    {
+        return $this->member->isStaff();
     }
 
     public function getMembersProperty()
