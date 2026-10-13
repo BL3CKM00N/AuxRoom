@@ -75,6 +75,9 @@ new class extends Component
                     <a href="{{ $guestRoom ? $tabUrl('queue') : route('dashboard') }}" wire:navigate class="flex items-center">
                         <x-logo class="h-6" />
                     </a>
+                    @if ($hostedRoom && (request()->routeIs('dashboard') || request()->routeIs('rooms.show')))
+                        <x-live-status class="ms-3" />
+                    @endif
                 </div>
 
                 <!-- Navigation Links -->

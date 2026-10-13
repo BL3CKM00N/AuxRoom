@@ -80,6 +80,8 @@ class PartyScreen extends Component
             isPlaying: $this->room->is_playing,
         );
 
+        $this->dispatch('watcher-status', alive: WatchState::watcherAlive());
+
         return view('livewire.dashboard.party')
             ->layout('layouts.room', ['title' => 'Party screen', 'preview' => SharePreview::forParty($this->room)]);
     }

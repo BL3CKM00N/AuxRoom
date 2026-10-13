@@ -70,6 +70,7 @@
          regardless of the idle-timer/opacity state above. --}}
     <div class="absolute top-6 right-6 z-20 flex items-center gap-4 transition-opacity duration-300"
          :class="controlsVisible ? 'opacity-100' : 'opacity-0'">
+        <x-live-status align="right" />
         {{-- Fullscreen API isn't supported on mobile browsers (iOS Safari
              doesn't implement it at all), so the button is desktop-only. --}}
         <button x-on:click="toggleFullscreen()" class="hidden sm:block text-aux-faint hover:text-aux-text">

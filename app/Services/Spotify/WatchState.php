@@ -29,6 +29,14 @@ class WatchState
         Cache::put('watcher:heartbeat', now()->getTimestamp(), self::HEARTBEAT_TTL);
     }
 
+    /** Seconds since the watcher last reported in, or null when it has not within the heartbeat window. */
+    public static function heartbeatAge(): ?int
+    {
+        $beat = Cache::get('watcher:heartbeat');
+
+        return $beat === null ? null : max(0, now()->getTimestamp() - (int) $beat);
+    }
+
     public static function watcherAlive(): bool
     {
         return Cache::get('watcher:heartbeat') !== null;

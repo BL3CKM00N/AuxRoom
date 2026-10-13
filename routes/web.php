@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinController;
@@ -14,6 +15,9 @@ use Livewire\Volt\Volt;
 Route::get('/', HomeController::class);
 
 Route::get('/help', HelpController::class)->name('help');
+
+// For Uptime Kuma: 503 when the watcher or the websocket server is down. See App\Services\HealthCheck.
+Route::get('/health/watcher', HealthController::class)->middleware('throttle:60,1')->name('health.watcher');
 
 // Approving a login on another device. Open to anyone (a logged-out phone gets an explanation); the
 // approving itself needs an account, and is limited. See App\Services\Auth\QrLogin.

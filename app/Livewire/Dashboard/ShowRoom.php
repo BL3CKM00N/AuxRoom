@@ -367,6 +367,8 @@ class ShowRoom extends Component
             volumePercent: $this->room->volume_percent,
         );
 
+        $this->dispatch('watcher-status', alive: WatchState::watcherAlive());
+
         $this->dispatch('location-status',
             enforced: $this->room->location_enforced,
             verified: $this->isHost || $this->member->passesLocationCheck(),

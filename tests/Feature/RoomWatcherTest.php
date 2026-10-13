@@ -293,6 +293,8 @@ class RoomWatcherTest extends TestCase
 
     public function test_screens_tell_the_watcher_someone_is_looking(): void
     {
+        // Whole seconds are compared, so a second boundary crossed mid-test would read 1, not 0.
+        $this->freezeTime();
         $room = $this->room();
         $this->spotify([$this->playerState('t1')]);
         $this->assertNull(WatchState::secondsSinceTouched($room));
