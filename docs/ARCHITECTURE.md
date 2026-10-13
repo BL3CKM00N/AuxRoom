@@ -106,8 +106,8 @@ surprising is learned, delete lines that stop being true.
 
 ## Monitoring
 
-- Uptime Kuma (LAN): the homepage monitor (id 8) exists. Add `/health/watcher` and `/up` monitors (tag Public) with the
-  `uptimekuma` skill's `manage.mjs`.
+- Uptime Kuma (LAN), all tagged Public: the homepage (id 8), `/health/watcher` (id 20, 503 when the watcher or Reverb is down) and
+  `/up` (id 21). Created with the `uptimekuma` skill's `manage.mjs`. The watcher monitor has not been seen going red.
 
 ## Working agreements
 
