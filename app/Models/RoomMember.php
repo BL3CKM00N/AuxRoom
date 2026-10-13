@@ -69,6 +69,11 @@ class RoomMember extends Model
         return $this->hasMany(QueueItem::class, 'added_by_id');
     }
 
+    public function isCohost(): bool
+    {
+        return $this->role === 'cohost';
+    }
+
     public function isHost(): bool
     {
         return $this->role === 'host';
@@ -103,7 +108,7 @@ class RoomMember extends Model
             return true;
         }
 
-        if ($this->isHost() || $this->location_exempt) {
+        if ($this->isStaff() || $this->location_exempt) {
             return true;
         }
 

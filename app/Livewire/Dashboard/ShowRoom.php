@@ -201,7 +201,7 @@ class ShowRoom extends Component
         return $this->room->activeMembers()
             ->where(fn ($q) => $q->where('role', 'host')->orWhereNotNull('approved_at'))
             ->with('user.spotifyAccount')
-            ->orderByDesc('role')
+            ->orderByRaw("case role when 'host' then 0 when 'cohost' then 1 else 2 end")
             ->orderBy('id')
             ->get();
     }

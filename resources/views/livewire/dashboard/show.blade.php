@@ -73,7 +73,7 @@
 
             @if ($activeTab === 'hub' && $this->isHost)
                 @include('livewire.dashboard.tabs.hub')
-            @elseif ($activeTab === 'guests' && $this->isHost)
+            @elseif ($activeTab === 'guests' && $this->canManage)
                 @include('livewire.dashboard.tabs.guests')
             @else
                 @include('livewire.dashboard.tabs.queue')

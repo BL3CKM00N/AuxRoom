@@ -31,7 +31,7 @@ trait ManagesGuestPermissions
      */
     public function canGuest(string $ability): bool
     {
-        if ($this->isHost) {
+        if ($this->canManage) {
             return true;
         }
 
@@ -66,13 +66,13 @@ trait ManagesGuestPermissions
             return false;
         }
 
-        if (! $this->isHost && $ability === 'guests_can_add_to_queue' && ! $this->room->guests_can_add_to_queue) {
+        if (! $this->canManage && $ability === 'guests_can_add_to_queue' && ! $this->room->guests_can_add_to_queue) {
             $this->fail('ROOM-QUEUE-LOCKED', 'The host has locked the queue for everyone.');
 
             return false;
         }
 
-        if (! $this->isHost && $ability !== 'guests_can_add_to_queue' && ! (bool) $this->member->{self::ABILITY_COLUMNS[$ability]}) {
+        if (! $this->canManage && $ability !== 'guests_can_add_to_queue' && ! (bool) $this->member->{self::ABILITY_COLUMNS[$ability]}) {
             $this->fail('ROOM-NO-PERMISSION', 'The host hasn\'t given you this permission.');
 
             return false;
@@ -155,13 +155,44 @@ trait ManagesGuestPermissions
         $this->broadcastUpdate('settings');
     }
 
+    /** Only the host picks co-hosts, and only from guests already let in. */
+    public function makeCohost(int $memberId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if ($target && $target->role === 'guest' && $target->approved_at !== null && $target->left_at === null) {
+            $target->update(['role' => 'cohost']);
+            $this->logActivity('member_promoted', "{$target->display_name} is now a co-host.");
+            $this->broadcastUpdate('members');
+        }
+    }
+
+    public function removeCohost(int $memberId): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
+
+        if ($target && $target->isCohost()) {
+            $target->update(['role' => 'guest']);
+            $this->logActivity('member_demoted', "{$target->display_name} is no longer a co-host.");
+            $this->broadcastUpdate('members');
+        }
+    }
+
     public function revokeAllAccess(): void
     {
         if (! $this->isHost) {
             return;
         }
 
-        $this->room->members()->where('role', 'guest')->update(['left_at' => now()]);
+        $this->room->members()->whereIn('role', ['guest', 'cohost'])->update(['left_at' => now()]);
 
         do {
             $code = Room::generateInviteCode();
@@ -191,13 +222,14 @@ trait ManagesGuestPermissions
 
     public function kickMember(int $memberId): void
     {
-        if (! $this->isHost) {
+        if (! $this->canManage) {
             return;
         }
 
         $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
 
-        if ($target && ! $target->isHost()) {
+        // A co-host can remove guests, not the host or another co-host.
+        if ($target && ! $target->isHost() && ($this->isHost || ! $target->isStaff())) {
             $target->update(['left_at' => now()]);
             $this->logActivity('member_kicked', "{$target->display_name} was removed from the room.");
             $this->broadcastUpdate('members');
@@ -206,13 +238,13 @@ trait ManagesGuestPermissions
 
     public function approveMember(int $memberId): void
     {
-        if (! $this->isHost) {
+        if (! $this->canManage) {
             return;
         }
 
         $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
 
-        if ($target && ! $target->isHost()) {
+        if ($target && ! $target->isStaff()) {
             $target->update(['approved_at' => now()]);
             $this->logActivity('member_approved', "{$target->display_name} was let into the room.");
             $this->broadcastUpdate('members');
@@ -221,13 +253,13 @@ trait ManagesGuestPermissions
 
     public function denyMember(int $memberId): void
     {
-        if (! $this->isHost) {
+        if (! $this->canManage) {
             return;
         }
 
         $target = RoomMember::where('room_id', $this->room->id)->where('id', $memberId)->first();
 
-        if ($target && ! $target->isHost()) {
+        if ($target && ! $target->isStaff()) {
             $target->update(['left_at' => now()]);
             $this->logActivity('member_denied', "{$target->display_name}'s request to join was denied.");
             $this->broadcastUpdate('members');

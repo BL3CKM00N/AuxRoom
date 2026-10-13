@@ -17,6 +17,7 @@ trait ManagesConfirmModal
      */
     private const CONFIRMABLE_ACTIONS = [
         'closeRoom',
+        'makeCohost',
         'denyMember',
         'kickMember',
         'revokeAllAccess',

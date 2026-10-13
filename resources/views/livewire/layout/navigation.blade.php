@@ -83,6 +83,16 @@ new class extends Component
                         <x-nav-link :href="$tabUrl('queue')" :active="$tabActive('queue', 'queue')" wire:navigate>
                             Now Playing
                         </x-nav-link>
+                        @if ($guestMember?->isStaff())
+                            <x-nav-link :href="$tabUrl('guests')" :active="$tabActive('guests', 'queue')" wire:navigate>
+                                <span class="inline-flex items-center gap-1.5">
+                                    Guests
+                                    @if ($guestRoom->pendingMembers()->count() > 0)
+                                        <span class="w-5 h-5 rounded-full bg-aux-accent text-black text-[10px] font-bold flex items-center justify-center">{{ $guestRoom->pendingMembers()->count() }}</span>
+                                    @endif
+                                </span>
+                            </x-nav-link>
+                        @endif
                         <x-nav-link :href="route('rooms.party', $guestRoom)" target="_blank"
                                     onclick="window.open(this.href, '_blank'); return false;">
                             Party Screen
@@ -175,6 +185,14 @@ new class extends Component
                 <x-responsive-nav-link :href="$tabUrl('queue')" :active="$tabActive('queue', 'queue')" wire:navigate>
                     Now Playing
                 </x-responsive-nav-link>
+                @if ($guestMember?->isStaff())
+                    <x-responsive-nav-link :href="$tabUrl('guests')" :active="$tabActive('guests', 'queue')" wire:navigate>
+                        Guests
+                        @if ($guestRoom->pendingMembers()->count() > 0)
+                            <span class="ml-1 inline-flex w-4 h-4 rounded-full bg-aux-accent text-black text-[9px] font-bold items-center justify-center">{{ $guestRoom->pendingMembers()->count() }}</span>
+                        @endif
+                    </x-responsive-nav-link>
+                @endif
                 <x-responsive-nav-link :href="route('rooms.party', $guestRoom)" target="_blank"
                                         onclick="window.open(this.href, '_blank'); return false;">
                     Party Screen
