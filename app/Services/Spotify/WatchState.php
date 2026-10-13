@@ -42,6 +42,20 @@ class WatchState
         return Cache::get('watcher:heartbeat') !== null;
     }
 
+    /** Spotify was just asked about this room (by the watcher or a page) and answered. */
+    public static function markVerified(Room $room): void
+    {
+        Cache::put("watch:verified:{$room->id}", now()->getTimestamp(), 30);
+    }
+
+    /** Seconds since the room's state was last confirmed with Spotify, or null when it has not been lately. */
+    public static function verifiedAge(Room $room): ?int
+    {
+        $at = Cache::get("watch:verified:{$room->id}");
+
+        return $at === null ? null : max(0, now()->getTimestamp() - (int) $at);
+    }
+
     /** A screen (dashboard, guest page, party screen) saying "someone is looking at this room". */
     public static function touch(Room $room): void
     {

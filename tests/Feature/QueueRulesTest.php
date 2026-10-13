@@ -53,6 +53,9 @@ class QueueRulesTest extends TestCase
         $this->guest->update(['approved_at' => now()]);
 
         Cache::flush();
+
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($this->room);
         Http::fake([
             'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => [
                 $this->apiTrack('s1', 'Song One', 'ar1', 'Artist One'),

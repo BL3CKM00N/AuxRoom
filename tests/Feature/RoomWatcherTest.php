@@ -44,6 +44,9 @@ class RoomWatcherTest extends TestCase
 
         Cache::flush();
 
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($room);
+
         return $room;
     }
 
@@ -251,6 +254,7 @@ class RoomWatcherTest extends TestCase
         // Past the client's own 3-second cache, so only the watcher's stored lists can answer the page.
         $this->travel(10)->seconds();
         WatchState::beat();
+        WatchState::markVerified($room);   // the watcher keeps a watched room confirmed every second or so
         Http::fake();   // from here on, any request would be a render waiting on Spotify
 
         Livewire::actingAs($room->host)->test(ShowRoom::class, ['room' => $room])

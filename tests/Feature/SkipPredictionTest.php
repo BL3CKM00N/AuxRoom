@@ -43,6 +43,9 @@ class SkipPredictionTest extends TestCase
         app(RoomMembership::class)->joinAsHost($room);
 
         Cache::flush();
+
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($room);
         Http::fake([
             'api.spotify.com/v1/me/player/queue*' => Http::response(['queue' => array_map(fn ($id) => $this->track($id), $queue)]),
             'api.spotify.com/v1/me/player/devices' => Http::response(['devices' => [['id' => 'd1', 'name' => 'Laptop', 'type' => 'Computer', 'is_active' => true, 'supports_volume' => true]]]),

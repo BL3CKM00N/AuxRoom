@@ -28,6 +28,9 @@ surprising is learned, delete lines that stop being true.
   (`WatchState::expect`, `settled()`), which is what stops a skip from "undoing itself".
 - Skip shows the next track immediately by predicting it from the queue (`PlaybackPrediction`). Not possible with shuffle,
   repeat-one or at the end of a playlist; those show once the watcher confirms.
+- Opening a room that nobody has confirmed lately (a new room, or an unwatched one) makes the page read Spotify once itself
+  (`PlaybackSync::refreshIfStale`, guarded by `WatchState::verifiedAge`), so the first render shows the song. A push sent before the page's
+  websocket was ready is lost, so `echo.js` announces `realtime-connected` and the room pages re-read once when it comes up.
 - If the watcher is dead (`WatchState::watcherAlive()`, heartbeat TTL 15s) pages fall back to polling Spotify themselves
   (host dashboard 10s, party screen 15s). `/health/watcher` reports 503 when the heartbeat or Reverb is down.
 - The live dot in the room header is client side: websocket state plus the server's `watcher-status` event.

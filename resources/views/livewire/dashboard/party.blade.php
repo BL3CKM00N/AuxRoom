@@ -1,4 +1,4 @@
-<div wire:poll.15s="poll" x-on:app-resumed.window="$wire.poll()"
+<div wire:poll.15s="poll" x-on:app-resumed.window="$wire.poll()" x-on:realtime-connected.window="$wire.poll()"
      x-data="{
         accent: @js(\App\Services\AlbumTint::accent($room->now_playing_tint)),
         isTouch: matchMedia('(pointer: coarse)').matches,

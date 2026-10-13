@@ -5,8 +5,8 @@ namespace App\Services\Spotify;
 use App\Events\RoomUpdated;
 use App\Models\ActivityEvent;
 use App\Models\PlayedTrack;
-use App\Services\AlbumTint;
 use App\Models\Room;
+use App\Services\AlbumTint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
@@ -49,7 +49,26 @@ class PlaybackSync
             return;
         }
 
+        WatchState::markVerified($room);
         $this->applyState($room, $state, $actingMemberId);
+    }
+
+    /**
+     * Opening a room whose state nobody has checked lately (a new room, or one nobody was watching) would show
+     * what was stored, possibly nothing, until the watcher catches up. So the page asks Spotify once itself.
+     * Not when the watcher keeps the room fresh, nor right after another command or a very recent look.
+     */
+    public function refreshIfStale(Room $room, int $maxAgeSeconds = 5): bool
+    {
+        $age = WatchState::verifiedAge($room);
+
+        if (($age !== null && $age < $maxAgeSeconds) || $room->commandedRecently() || ! Cache::add("sync-on-open:{$room->id}", 1, 3)) {
+            return false;
+        }
+
+        $this->sync($room);
+
+        return true;
     }
 
     /**

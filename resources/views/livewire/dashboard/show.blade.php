@@ -1,4 +1,4 @@
-<div wire:poll.10s="heartbeat" x-on:app-resumed.window="$wire.heartbeat()" x-data="roomLocation('{{ route('join', ['code' => $room->invite_code]) }}')" x-init="init()" class="flex-1 flex flex-col bg-aux-bg text-aux-text">
+<div wire:poll.10s="heartbeat" x-on:app-resumed.window="$wire.heartbeat()" x-on:realtime-connected.window="$wire.heartbeat()" x-data="roomLocation('{{ route('join', ['code' => $room->invite_code]) }}')" x-init="init()" class="flex-1 flex flex-col bg-aux-bg text-aux-text">
 
 @if (! $this->isApproved)
 

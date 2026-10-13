@@ -26,6 +26,8 @@ class PartyScreen extends Component
 
         $this->room = $room;
         WatchState::touch($room);
+
+        app(PlaybackSync::class)->refreshIfStale($room);
     }
 
     #[On('echo:room.{room.invite_code},RoomUpdated')]

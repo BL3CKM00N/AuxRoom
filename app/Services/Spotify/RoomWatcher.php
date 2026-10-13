@@ -85,6 +85,7 @@ class RoomWatcher
         }
 
         Cache::forget("watch:failures:{$room->id}");
+        WatchState::markVerified($room);
 
         $burst = WatchState::burst($room);
 

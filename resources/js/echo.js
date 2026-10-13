@@ -29,4 +29,14 @@ if (key) {
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
     });
+
+    // A push sent before the connection and its channel were ready is gone for good: the page is drawn first,
+    // the connection comes a moment later (a new room's first song arrived exactly in that gap). So when the
+    // connection comes up, the first time or after a drop, the pages re-read the room once.
+    let announced = false;
+    window.Echo.connector.pusher.connection.bind('connected', () => {
+        const again = announced;
+        announced = true;
+        setTimeout(() => window.dispatchEvent(new CustomEvent('realtime-connected', { detail: { again } })), 600);
+    });
 }

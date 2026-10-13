@@ -36,6 +36,9 @@ class CommandFailureMessageTest extends TestCase
         ])->refresh();
         app(RoomMembership::class)->joinAsHost($room);
 
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($room);
+
         return $room;
     }
 

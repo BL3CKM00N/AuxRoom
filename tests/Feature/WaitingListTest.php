@@ -54,6 +54,9 @@ class WaitingListTest extends TestCase
         $this->person('ben');
 
         Cache::flush();
+
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($this->room);
         WatchState::beat();
         Http::fake([
             'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => array_map(fn ($i) => $this->apiTrack("s{$i}"), [1, 2, 3, 4])]]),

@@ -16,6 +16,7 @@ use App\Models\ActivityEvent;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\Queue\QueueFeeder;
+use App\Services\Spotify\PlaybackSync;
 use App\Services\RoomMembership;
 use App\Services\Spotify\SpotifyCheck;
 use App\Services\Spotify\UpcomingQueue;
@@ -83,6 +84,11 @@ class ShowRoom extends Component
         $found->update(['last_seen_at' => now()]);
         $this->memberId = $found->id;
         WatchState::touch($room);
+
+        // A new room, or one nobody was watching, has nothing stored yet: ask Spotify now so the first render shows the song.
+        if ($found->isApproved()) {
+            app(PlaybackSync::class)->refreshIfStale($room);
+        }
 
         if (! request()->has('tab')) {
             $this->activeTab = 'queue';

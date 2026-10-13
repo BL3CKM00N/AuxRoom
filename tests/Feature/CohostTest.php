@@ -52,6 +52,9 @@ class CohostTest extends TestCase
         $this->person('pending', approved: false);
 
         Cache::flush();
+
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($this->room);
         Http::fake([
             'api.spotify.com/v1/me/player/pause*' => Http::response('', 204),
             'api.spotify.com/v1/me/player/next*' => Http::response('', 204),

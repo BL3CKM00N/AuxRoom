@@ -27,6 +27,9 @@ class MobileLayoutTest extends TestCase
         $room = Room::create($roomAttributes + ['invite_code' => 'AAAAAA-BBBBBB-CCCCCC', 'host_id' => $host->id, 'playback_provider_id' => $host->id])->refresh();
         app(RoomMembership::class)->joinAsHost($room);
 
+        // A room that has been running: the watcher confirmed it a moment ago, so opening it asks Spotify nothing.
+        \App\Services\Spotify\WatchState::markVerified($room);
+
         Http::fake([
             'api.spotify.com/v1/me/player/queue' => Http::response(['queue' => []]),
             'api.spotify.com/v1/me/player/devices' => Http::response(['devices' => $devices ?? [
