@@ -82,6 +82,8 @@ surprising is learned, delete lines that stop being true.
 - Test sessions use the array driver; set `session.driver` to `database` for device-list tests.
 - The first browser run right after a PHP run can time out; run it again.
 - `pint --test` already fails on old files; do not mass-reformat.
+- In a Livewire update request (a refresh or a wire:click) `request()->routeIs()` and `request()->query()` describe Livewire's own
+  request, not the page. Anything that polls and depends on the page (the nav) must remember it at mount (`NavigationRefreshTest`).
 
 ## Monitoring
 

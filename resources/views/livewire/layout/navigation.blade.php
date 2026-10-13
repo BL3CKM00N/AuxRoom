@@ -4,6 +4,7 @@ use App\Livewire\Actions\Logout;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Services\RoomMembership;
+use Livewire\Attributes\Locked;
 use Livewire\Volt\Component;
 
 new class extends Component
@@ -16,6 +17,25 @@ new class extends Component
     public ?Room $room = null;
 
     public ?int $memberId = null;
+
+    /**
+     * Which page this menu was first drawn on. Remembered here because the menu refreshes itself over
+     * Livewire every 10 seconds, and in that request the route is Livewire's own, not the page's: reading
+     * request()->routeIs() then lost the highlighted tab and the live dot after the first refresh.
+     */
+    #[Locked]
+    public string $routeName = '';
+
+    #[Locked]
+    public string $currentTab = '';
+
+    public function mount(?Room $room = null, ?int $memberId = null): void
+    {
+        $this->room = $room;
+        $this->memberId = $memberId;
+        $this->routeName = (string) request()->route()?->getName();
+        $this->currentTab = (string) request()->query('tab', '');
+    }
 
     /**
      * Log the current user out of the application.
@@ -61,8 +81,8 @@ new class extends Component
         : route('dashboard', ['tab' => $tab]);
 
     $tabActive = fn (string $tab, string $default) => $guestRoom
-        ? request()->routeIs('rooms.show') && request()->query('tab', $default) === $tab
-        : request()->routeIs('dashboard') && request()->query('tab', $default) === $tab;
+        ? $routeName === 'rooms.show' && ($currentTab ?: $default) === $tab
+        : $routeName === 'dashboard' && ($currentTab ?: $default) === $tab;
 @endphp
 
 <nav x-data="{ open: false }" wire:poll.10s="$refresh" x-on:app-resumed.window="$wire.$refresh()" class="fixed top-0 inset-x-0 z-30 bg-aux-sidebar border-b border-aux-border">
@@ -75,7 +95,7 @@ new class extends Component
                     <a href="{{ $guestRoom ? $tabUrl('queue') : route('dashboard') }}" wire:navigate class="flex items-center">
                         <x-logo class="h-6" />
                     </a>
-                    @if ($hostedRoom && (request()->routeIs('dashboard') || request()->routeIs('rooms.show')))
+                    @if ($hostedRoom && in_array($routeName, ['dashboard', 'rooms.show'], true))
                         <x-live-status class="ms-3" />
                     @endif
                 </div>
@@ -120,7 +140,7 @@ new class extends Component
                             Party Screen
                         </x-nav-link>
                     @else
-                        <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard') || request()->routeIs('rooms.*')" wire:navigate>
+                        <x-nav-link :href="route('dashboard')" :active="$routeName === 'dashboard' || \Illuminate\Support\Str::is('rooms.*', $routeName)" wire:navigate>
                             {{ __('Dashboard') }}
                         </x-nav-link>
                     @endif
@@ -218,7 +238,7 @@ new class extends Component
                     Party Screen
                 </x-responsive-nav-link>
             @else
-                <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard') || request()->routeIs('rooms.*')" wire:navigate>
+                <x-responsive-nav-link :href="route('dashboard')" :active="$routeName === 'dashboard' || \Illuminate\Support\Str::is('rooms.*', $routeName)" wire:navigate>
                     {{ __('Dashboard') }}
                 </x-responsive-nav-link>
             @endif
