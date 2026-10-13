@@ -3,7 +3,9 @@
 namespace App\Services\Spotify;
 
 use App\Models\SpotifyAccount;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class SpotifyTokenManager
@@ -21,26 +23,71 @@ class SpotifyTokenManager
     /** Token-endpoint errors that mean "these credentials will never work again". */
     private const PERMANENT_ERRORS = ['invalid_grant', 'invalid_client'];
 
+    /** How long to wait for another process that is refreshing the same login. */
+    public int $lockWaitSeconds = 5;
+
     public function ensureFreshToken(SpotifyAccount $account): void
     {
-        if ($account->needsReconnect()) {
-            if ($account->needs_reconnect_at->gt(now()->subMinutes(self::RETRY_AFTER_MINUTES))) {
+        if (! $this->due($account)) {
+            return;
+        }
+
+        // The watcher and the web requests all use the same login. Two refreshes at once can each use the same
+        // refresh token, and when Spotify has already rotated it the second one is rejected for good, which flags
+        // the account as disconnected. So one process refreshes and the others use what it got.
+        $lock = $this->acquire($account);
+
+        try {
+            // Whoever held the lock may have done it already.
+            $account->refresh();
+
+            if (! $this->due($account)) {
                 return;
             }
 
-            // Claim this retry slot first so concurrent requests don't all
-            // fire their own; a successful refresh clears the flag again.
-            $account->update(['needs_reconnect_at' => now()]);
+            if ($account->needsReconnect()) {
+                // Claim this retry slot first so concurrent requests don't all
+                // fire their own; a successful refresh clears the flag again.
+                $account->update(['needs_reconnect_at' => now()]);
+            }
+
             $this->refresh($account);
+        } finally {
+            $lock?->release();
+        }
+    }
 
-            return;
+    /** Does this login need a refresh right now? (A login Spotify rejected is only retried now and then.) */
+    private function due(SpotifyAccount $account): bool
+    {
+        if ($account->needsReconnect()) {
+            return ! $account->needs_reconnect_at->gt(now()->subMinutes(self::RETRY_AFTER_MINUTES));
         }
 
-        if (! $account->isTokenExpired()) {
-            return;
+        return $account->isTokenExpired();
+    }
+
+    /**
+     * The lock for this account's refresh, or null when it stayed busy for the whole wait (the caller then
+     * looks again and refreshes anyway if it is still due). Falls back to the database when Redis is down:
+     * a Redis lock object only fails when it is first used.
+     */
+    private function acquire(SpotifyAccount $account): ?\Illuminate\Contracts\Cache\Lock
+    {
+        foreach ([null, 'database'] as $store) {
+            try {
+                $lock = Cache::store($store)->lock("spotify-refresh:{$account->id}", 15);
+                $lock->block($this->lockWaitSeconds);
+
+                return $lock;
+            } catch (LockTimeoutException) {
+                return null;
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
-        $this->refresh($account);
+        return null;
     }
 
     public function refresh(SpotifyAccount $account): bool

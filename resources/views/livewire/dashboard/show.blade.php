@@ -1,4 +1,5 @@
 <div wire:poll.10s="heartbeat" x-on:app-resumed.window="$wire.heartbeat()" x-on:realtime-connected.window="$wire.heartbeat()" x-data="roomLocation('{{ route('join', ['code' => $room->invite_code]) }}')" x-init="init()" class="flex-1 flex flex-col bg-aux-bg text-aux-text">
+    <div x-data="roomGuard('{{ $room->invite_code }}', 'heartbeat')" class="hidden"></div>
 
 @if (! $this->isApproved)
 
@@ -135,7 +136,7 @@
             </div>
             <div class="w-full max-w-md min-w-0 flex items-center gap-2 text-[10px] text-aux-faint"
                  x-data="playbackClock()"
-                 x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                 x-init="sync({ positionMs: {{ $this->currentPositionMs }}, startedAtMs: {{ $room->startedAtMs() ?? 'null' }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                  x-on:playback-sync.window="sync($event.detail)">
                 <span class="shrink-0" x-text="formatMs(positionMs)"></span>
                 <input type="range" min="0" :max="durationMs || 100" :value="positionMs"

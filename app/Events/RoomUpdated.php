@@ -7,6 +7,7 @@ use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -19,7 +20,7 @@ class RoomUpdated implements ShouldBroadcastNow
 {
     use InteractsWithSockets, SerializesModels;
 
-    public function __construct(public Room $room, public string $reason = 'update') {}
+    public function __construct(public Room $room, public string $reason = 'update', public ?int $seq = null) {}
 
     /**
      * ShouldBroadcastNow means this goes out inline with the request, not
@@ -33,13 +34,30 @@ class RoomUpdated implements ShouldBroadcastNow
     public static function broadcastFor(Room $room, string $reason = 'update'): void
     {
         try {
-            broadcast(new self($room, $reason));
+            broadcast(new self($room, $reason, self::nextSequence($room)));
         } catch (Throwable $e) {
             Log::warning('Failed to broadcast RoomUpdated', [
                 'room_id' => $room->id,
                 'reason' => $reason,
                 'exception' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Every push of a room carries the next number. A screen that sees a number missing knows a push was lost
+     * on the way and re-reads the room, instead of staying wrong until the next scheduled check.
+     */
+    private static function nextSequence(Room $room): ?int
+    {
+        try {
+            $key = "room:seq:{$room->id}";
+            Cache::add($key, 0, 86400);
+            $next = Cache::increment($key);
+
+            return is_int($next) ? $next : null;
+        } catch (Throwable) {
+            return null;
         }
     }
 
@@ -55,6 +73,6 @@ class RoomUpdated implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return ['reason' => $this->reason];
+        return ['reason' => $this->reason, 'seq' => $this->seq];
     }
 }

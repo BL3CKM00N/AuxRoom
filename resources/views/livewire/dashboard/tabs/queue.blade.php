@@ -62,7 +62,7 @@
                     @if ($controlsActive)
                         <div class="mt-3 flex items-center gap-2 text-[11px] text-aux-faint"
                              x-data="playbackClock()"
-                             x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                             x-init="sync({ positionMs: {{ $this->currentPositionMs }}, startedAtMs: {{ $room->startedAtMs() ?? 'null' }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                              x-on:playback-sync.window="sync($event.detail)">
                             <span x-text="formatMs(positionMs)"></span>
                             <input type="range" min="0" :max="durationMs || 100" :value="positionMs"

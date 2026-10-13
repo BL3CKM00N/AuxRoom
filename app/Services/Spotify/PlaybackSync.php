@@ -27,6 +27,12 @@ class PlaybackSync
     /** A track this close to its start, paused, is "parked", not something a person paused mid-song. */
     private const PARKED_AT_START_MS = 3000;
 
+    /** A position this far off is a jump, and goes out to every screen. */
+    private const JUMP_MS = 800;
+
+    /** A position this far off is corrected quietly, without a push. */
+    private const NUDGE_MS = 300;
+
     public function __construct(private SpotifyClientFactory $clients) {}
 
     /**
@@ -127,7 +133,13 @@ class PlaybackSync
             }
         }
 
-        $drifted = abs($state['progress_ms'] - $room->currentPositionMs()) > 3000;
+        // The position Spotify reports is as of the moment it answered, so the room's own position is compared at that
+        // same moment. A real jump (a seek, a skip made elsewhere) is pushed to every screen; a small difference is
+        // only the clock creeping, so the start time is nudged quietly and nobody is disturbed.
+        $fetchedMs = (float) ($state['fetched_at_ms'] ?? Carbon::now()->getPreciseTimestamp(3));
+        $drift = abs($state['progress_ms'] - $room->positionAtMs($fetchedMs));
+        $drifted = $drift > self::JUMP_MS;
+        $nudge = $drift > self::NUDGE_MS && $state['is_playing'] && $room->is_playing;
         $playStateChanged = $state['is_playing'] !== $room->is_playing;
         $fallbackFlagChanged = $isFallbackContext !== $room->is_playing_fallback;
         $shuffleChanged = $state['shuffle_enabled'] !== $room->shuffle_enabled
@@ -142,6 +154,13 @@ class PlaybackSync
         $detailsMissing = $room->now_playing_artists === null && ! empty($state['artists']);
 
         if (! $detailsMissing && ! $wasInactive && ! $volumeChanged && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
+            if ($nudge) {
+                $room->update([
+                    'now_playing_position_ms' => $state['progress_ms'],
+                    'now_playing_started_at' => Carbon::createFromTimestampMs((int) round($fetchedMs - $state['progress_ms']), config('app.timezone')),
+                ]);
+            }
+
             $this->tint($room);
 
             return;
@@ -160,7 +179,7 @@ class PlaybackSync
             'is_playing_fallback' => $isFallbackContext,
             'is_playing' => $state['is_playing'],
             'now_playing_position_ms' => $state['progress_ms'],
-            'now_playing_started_at' => $state['is_playing'] ? now()->subMilliseconds($state['progress_ms']) : null,
+            'now_playing_started_at' => $state['is_playing'] ? Carbon::createFromTimestampMs((int) round($fetchedMs - $state['progress_ms']), config('app.timezone')) : null,
             'shuffle_enabled' => $state['shuffle_enabled'],
             'smart_shuffle_enabled' => $state['smart_shuffle_enabled'],
             'volume_percent' => $state['volume_percent'] ?? $room->volume_percent,

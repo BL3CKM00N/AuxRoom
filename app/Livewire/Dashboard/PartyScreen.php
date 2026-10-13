@@ -30,7 +30,7 @@ class PartyScreen extends Component
         app(PlaybackSync::class)->refreshIfStale($room);
     }
 
-    #[On('echo:room.{room.invite_code},RoomUpdated')]
+    #[On('echo:room.{room.invite_code},.RoomUpdated')]
     public function onRoomUpdated(): void
     {
         $this->room->refresh();
@@ -79,6 +79,9 @@ class PartyScreen extends Component
     {
         $this->dispatch('playback-sync',
             positionMs: $this->currentPositionMs,
+            startedAtMs: $this->room->startedAtMs(),
+            serverNowMs: (int) round(microtime(true) * 1000),
+            verifiedAge: WatchState::verifiedAge($this->room),
             durationMs: $this->nowPlaying?->duration_ms ?? 0,
             isPlaying: $this->room->is_playing,
         );

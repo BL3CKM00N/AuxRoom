@@ -115,7 +115,7 @@ new class extends Component
     }
 
     /** Polled, and also run when the live push arrives. */
-    #[On('echo:qr-login.{token},QrLoginUpdated')]
+    #[On('echo:qr-login.{token},.QrLoginUpdated')]
     public function check(QrLogin $qr, CompleteQrLogin $complete): void
     {
         if (! in_array($this->state, ['pending', 'claimed'], true)) {

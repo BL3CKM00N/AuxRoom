@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Room;
 use App\Services\Spotify\WatchState;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,9 @@ use Throwable;
  */
 class HealthCheck
 {
+    /** A watched room whose last confirmation with Spotify is older than this counts as behind. */
+    private const BEHIND_SECONDS = 10;
+
     /** @return array{ok: bool, checks: array<string, array{ok: bool, detail?: string}>} */
     public function run(): array
     {
@@ -22,6 +26,7 @@ class HealthCheck
             'reverb' => $this->reverb(),
             'database' => $this->database(),
             'cache' => $this->cache(),
+            'rooms' => $this->rooms(),
         ];
 
         return ['ok' => collect($checks)->every(fn (array $check) => $check['ok']), 'checks' => $checks];
@@ -54,6 +59,34 @@ class HealthCheck
         fclose($socket);
 
         return ['ok' => true];
+    }
+
+    /**
+     * How fresh the rooms someone is looking at are. Informational: a room that is behind is usually Spotify
+     * answering slowly or asking us to back off, which is worth seeing but is not the watcher being down.
+     *
+     * @return array{ok: bool, detail: string, watched: int, behind: int}
+     */
+    private function rooms(): array
+    {
+        $watched = Room::whereNull('closed_at')->get()->filter(function (Room $room) {
+            $since = WatchState::secondsSinceTouched($room);
+
+            return $since !== null && $since <= WatchState::WATCHING_SECONDS;
+        });
+
+        $behind = $watched->filter(function (Room $room) {
+            $age = WatchState::verifiedAge($room);
+
+            return $age === null || $age > self::BEHIND_SECONDS;
+        });
+
+        return [
+            'ok' => true,
+            'detail' => "{$watched->count()} watched, {$behind->count()} confirmed with Spotify more than ".self::BEHIND_SECONDS.' seconds ago',
+            'watched' => $watched->count(),
+            'behind' => $behind->count(),
+        ];
     }
 
     private function database(): array

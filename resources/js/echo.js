@@ -28,6 +28,10 @@ if (key) {
         wssPort: port,
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
+        // A connection that has silently died (a phone that changed network, a sleeping laptop) is only noticed
+        // when a ping goes unanswered. The defaults take about a minute to give up; this takes about 20 seconds.
+        activityTimeout: 12000,
+        pongTimeout: 8000,
     });
 
     // A push sent before the connection and its channel were ready is gone for good: the page is drawn first,

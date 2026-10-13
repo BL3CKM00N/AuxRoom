@@ -41,6 +41,7 @@
      x-on:touchstart.window="resetIdleTimer()"
      :class="controlsVisible ? '' : 'cursor-none'"
      class="flex-1 bg-aux-bg text-aux-text flex flex-col relative">
+    <div x-data="roomGuard('{{ $room->invite_code }}', 'poll')" class="hidden"></div>
 
     {{-- Everything here is sized in rem, so the root font size scales the whole
          screen. The layout is up to ~74rem tall (art, a title that wraps to two
@@ -125,7 +126,7 @@
 
             <div class="mt-6 w-full max-w-sm lg:max-w-lg xl:max-w-xl"
                  x-data="playbackClock()"
-                 x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
+                 x-init="sync({ positionMs: {{ $this->currentPositionMs }}, startedAtMs: {{ $room->startedAtMs() ?? 'null' }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                  x-on:playback-sync.window="sync($event.detail)">
                 <div class="h-1.5 lg:h-2 bg-white/10 rounded-full overflow-hidden">
                     <div class="h-full party-accent-bg" :style="`width: ${seekPct}%`"></div>

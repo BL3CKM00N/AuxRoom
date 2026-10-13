@@ -5,6 +5,7 @@ namespace App\Services\Spotify;
 use App\Models\SpotifyAccount;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -434,8 +435,30 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     public function getPlaybackState(): ?array
     {
+        $sentAt = microtime(true);
         $response = $this->get('https://api.spotify.com/v1/me/player');
 
+        return $this->playbackStateFrom($response, $this->midpointMs($response, $sentAt));
+    }
+
+    /**
+     * The moment Spotify's answer describes, in epoch milliseconds: halfway through the request, since the
+     * progress it reports is as of when it built the answer, not when the answer reached us.
+     */
+    public function midpointMs(?Response $response, float $sentAt): float
+    {
+        $receivedAt = microtime(true);
+        $took = $response?->transferStats?->getTransferTime() ?? ($receivedAt - $sentAt);
+
+        return ($receivedAt - $took / 2) * 1000;
+    }
+
+    /**
+     * Turns the answer to GET /me/player into the state array (or null: no active device), or throws when it
+     * failed. Split out so the watcher can send several rooms' requests at once and parse the answers here.
+     */
+    public function playbackStateFrom(?Response $response, float $fetchedAtMs): ?array
+    {
         if (! $response) {
             throw new SpotifyRequestFailed('Spotify playback state could not be fetched');
         }
@@ -482,7 +505,18 @@ class SpotifyWebApiClient implements SpotifyClientContract
                 ? (int) $json['device']['volume_percent']
                 : null,
             'repeat_mode' => $json['repeat_state'] ?? 'off',
+            'fetched_at_ms' => $fetchedAtMs,
         ];
+    }
+
+    /**
+     * Adds this account's playback-state request to a pool (see RoomWatcher::prefetch).
+     */
+    public function addPlaybackStateRequest(Pool $pool, string $key): void
+    {
+        $this->http(self::READ_TIMEOUT_SECONDS);   // refreshes the token first, if it needs it
+
+        $pool->as($key)->withToken($this->account->access_token)->acceptJson()->timeout(self::READ_TIMEOUT_SECONDS)->get('https://api.spotify.com/v1/me/player');
     }
 
     /**

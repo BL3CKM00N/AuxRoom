@@ -35,6 +35,8 @@ class WatchSpotify extends Command
                 $roomsLoadedAt = microtime(true);
             }
 
+            $ready = [];
+
             foreach ($rooms as $room) {
                 if (! $once && microtime(true) < ($due[$room->id] ?? 0)) {
                     continue;
@@ -47,8 +49,15 @@ class WatchSpotify extends Command
                     continue;
                 }
 
+                $ready[] = $room;
+            }
+
+            // Rooms that are due together are asked at the same time, so one slow answer does not hold up the rest.
+            $answers = $watcher->prefetch(collect($ready));
+
+            foreach ($ready as $room) {
                 try {
-                    $next = $watcher->tick($room);
+                    $next = $watcher->tick($room, $answers[$room->id] ?? null);
                 } catch (\Throwable $e) {
                     report($e);
                     $next = 5.0;

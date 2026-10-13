@@ -20,6 +20,9 @@
     </head>
     <body class="font-sans antialiased bg-aux-bg text-aux-text">
         <x-offline-overlay />
+        @if (request()->boolean('debug'))
+            <x-debug-hud />
+        @endif
 
         {{-- flex flex-col (not just min-h-screen) so <main> can be flex-1 and
              stretch to fill the remaining height: the room dashboard's own

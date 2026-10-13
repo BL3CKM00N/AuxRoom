@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -101,6 +102,22 @@ class Room extends Model
             if ($room->wasChanged('last_local_command_at') && $room->last_local_command_at) {
                 \App\Services\Spotify\WatchState::expect($room, 'other', $room->now_playing_track_id);
             }
+        });
+    }
+
+    /**
+     * Setting the start time also keeps it to the millisecond (now_playing_started_ms): the datetime column
+     * only holds whole seconds, which made every position up to a second wrong.
+     */
+    protected function nowPlayingStartedAt(): Attribute
+    {
+        return Attribute::make(set: function ($value) {
+            $time = $value === null ? null : Carbon::parse($value);
+
+            return [
+                'now_playing_started_at' => $time?->format('Y-m-d H:i:s'),
+                'now_playing_started_ms' => $time ? $time->getTimestamp() * 1000 + intdiv($time->micro, 1000) : null,
+            ];
         });
     }
 
@@ -267,11 +284,35 @@ class Room extends Model
      */
     public function currentPositionMs(): int
     {
-        if (! $this->is_playing || ! $this->now_playing_started_at) {
+        return $this->positionAtMs(Carbon::now()->getPreciseTimestamp(3));
+    }
+
+    /** The position at a given moment (epoch milliseconds), by the stored start. */
+    public function positionAtMs(float $epochMs): int
+    {
+        if (! $this->is_playing) {
             return $this->now_playing_position_ms;
         }
 
-        return (int) $this->now_playing_started_at->diffInMilliseconds(Carbon::now(), true);
+        if ($this->now_playing_started_ms !== null) {
+            return max(0, (int) round($epochMs - $this->now_playing_started_ms));
+        }
+
+        if (! $this->now_playing_started_at) {
+            return $this->now_playing_position_ms;
+        }
+
+        return (int) max(0, $epochMs - $this->now_playing_started_at->getTimestamp() * 1000);
+    }
+
+    /** When the current song started (or would have, had it played from the beginning), in server epoch milliseconds; null while not playing. */
+    public function startedAtMs(): ?int
+    {
+        if (! $this->is_playing) {
+            return null;
+        }
+
+        return $this->now_playing_started_ms ?? ($this->now_playing_started_at ? $this->now_playing_started_at->getTimestamp() * 1000 : null);
     }
 
     /**

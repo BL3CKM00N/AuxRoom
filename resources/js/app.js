@@ -8,9 +8,12 @@
 
 import './echo';
 import './resume-sync';
+import './server-clock';
 import './alpine/room-location';
 import './alpine/offline-overlay';
 import './alpine/live-status';
+import './alpine/room-guard';
+import './alpine/debug-hud';
 import './alpine/qr-scanner';
 
 /**
@@ -47,15 +50,38 @@ document.addEventListener('alpine:init', () => {
         positionMs: 0,
         durationMs: 0,
         isPlaying: false,
+        // When the song started (or would have, had it played from the beginning), in server time.
+        // The position is the server's time now minus that, so it is right on every device, never drifts,
+        // and a throttled or backgrounded tab catches up the moment it wakes. Without it (a room that has
+        // nothing to say, like the demo) the position counts up from the last one the server sent.
+        startedAtMs: null,
+        lastTick: 0,
         dragging: false,
         timer: null,
 
         init() {
-            this.timer = setInterval(() => {
-                if (this.isPlaying && !this.dragging && this.durationMs > 0) {
-                    this.positionMs = Math.min(this.positionMs + 250, this.durationMs);
-                }
-            }, 250);
+            this.lastTick = Date.now();
+            this.timer = setInterval(() => this.tick(), 200);
+        },
+
+        tick() {
+            const now = Date.now();
+            const elapsed = now - this.lastTick;
+            this.lastTick = now;
+
+            if (!this.isPlaying || this.dragging || this.durationMs <= 0) {
+                return;
+            }
+
+            this.positionMs = this.startedAtMs !== null
+                ? this.fromServerClock()
+                : Math.min(this.positionMs + elapsed, this.durationMs);
+        },
+
+        fromServerClock() {
+            const position = window.serverClock.now() - this.startedAtMs;
+
+            return Math.max(0, Math.min(position, this.durationMs));
         },
 
         destroy() {
@@ -67,9 +93,11 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            this.positionMs = detail.positionMs ?? 0;
             this.durationMs = detail.durationMs ?? 0;
             this.isPlaying = detail.isPlaying ?? false;
+            this.startedAtMs = detail.startedAtMs ?? null;
+            this.positionMs = this.isPlaying && this.startedAtMs !== null ? this.fromServerClock() : (detail.positionMs ?? 0);
+            this.lastTick = Date.now();
         },
 
         get seekPct() {

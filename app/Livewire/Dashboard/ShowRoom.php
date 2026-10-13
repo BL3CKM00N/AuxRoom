@@ -132,7 +132,11 @@ class ShowRoom extends Component
         $this->activeTab = $tab;
     }
 
-    #[On('echo:room.{room.invite_code},RoomUpdated')]
+    /**
+     * The leading dot matters: the events are broadcast under a custom name (broadcastAs), and without the dot
+     * Echo listens for App\Events\RoomUpdated instead, which never arrives. See EchoEventNamesTest.
+     */
+    #[On('echo:room.{room.invite_code},.RoomUpdated')]
     public function onRoomUpdated(): mixed
     {
         return $this->redirectIfRemoved();
@@ -379,6 +383,9 @@ class ShowRoom extends Component
     {
         $this->dispatch('playback-sync',
             positionMs: $this->currentPositionMs,
+            startedAtMs: $this->room->startedAtMs(),
+            serverNowMs: (int) round(microtime(true) * 1000),
+            verifiedAge: WatchState::verifiedAge($this->room),
             durationMs: $this->nowPlaying?->duration_ms ?? 0,
             isPlaying: $this->room->is_playing,
             volumePercent: $this->room->volume_percent,

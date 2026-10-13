@@ -16,6 +16,10 @@ Route::get('/', HomeController::class);
 
 Route::get('/help', HelpController::class)->name('help');
 
+// The server's clock, for resources/js/server-clock.js. Light, and many guests can share one address, so the limit is generous.
+Route::get('/time', fn () => response()->json(['now' => round(microtime(true) * 1000, 1)])->header('Cache-Control', 'no-store'))
+    ->middleware('throttle:600,1')->name('time');
+
 // For Uptime Kuma: 503 when the watcher or the websocket server is down. See App\Services\HealthCheck.
 Route::get('/health/watcher', HealthController::class)->middleware('throttle:60,1')->name('health.watcher');
 

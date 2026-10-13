@@ -2,9 +2,14 @@
 
 namespace App\Services\Spotify;
 
+use App\Events\RoomUpdated;
 use App\Models\Room;
 use App\Services\Queue\QueueFeeder;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -33,6 +38,12 @@ class RoomWatcher
     /** Spotify trails its own audio by a moment; an 'other' command is given this long before its read is trusted. */
     private const SETTLE_SECONDS = 0.8;
 
+    /** Around a song's end the room is read at the fast interval: from this long before the end... */
+    private const END_WINDOW_BEFORE_MS = 1500;
+
+    /** ...until this long after it. */
+    private const END_WINDOW_AFTER_MS = 2000;
+
     private const QUEUE_REFRESH_SECONDS = 5;
 
     private const DEVICES_REFRESH_SECONDS = 10;
@@ -48,11 +59,90 @@ class RoomWatcher
 
         $since = WatchState::secondsSinceTouched($room);
 
-        return match (true) {
+        $base = match (true) {
             $since === null => null,
             $since <= WatchState::WATCHING_SECONDS => self::WATCHED_INTERVAL,
             default => self::RECENT_INTERVAL,
         };
+
+        return $base === null ? null : $this->aroundTrackEnd($room, $base);
+    }
+
+    /**
+     * The next song starts at a moment we can calculate, and that is the change everyone is looking at. From
+     * 1.5 seconds before the end until 2 seconds after (Spotify moves on a little late) the room is read every
+     * 0.3 seconds, and a slow cadence is shortened so its next read lands when that window opens.
+     */
+    private function aroundTrackEnd(Room $room, float $base): float
+    {
+        if (! $room->is_playing || $room->now_playing_duration_ms <= 0 || $room->repeat_mode === 'track') {
+            return $base;
+        }
+
+        $remainingMs = $room->now_playing_duration_ms - $room->currentPositionMs();
+
+        // Well past the end the room is stale or repeating: nothing to wait for.
+        if ($remainingMs < -self::END_WINDOW_AFTER_MS) {
+            return $base;
+        }
+
+        // Inside the window this is below the burst interval, so it is the burst interval; before it, the time until it opens.
+        return max(self::BURST_INTERVAL, min($base, ($remainingMs - self::END_WINDOW_BEFORE_MS) / 1000));
+    }
+
+    /**
+     * Sends the playback-state requests of several rooms at once. The answers go to tick(), which parses them
+     * and handles failures exactly as for a single request. Only worth it for two or more.
+     *
+     * @param  Collection<int, Room>  $rooms
+     * @return array<int, array{response: Response, at: float}>
+     */
+    public function prefetch(Collection $rooms): array
+    {
+        $clients = [];
+
+        foreach ($rooms as $room) {
+            $client = $this->clients->forRoom($room);
+
+            if ($client instanceof SpotifyWebApiClient) {
+                $clients[$room->id] = $client;
+            }
+        }
+
+        if (count($clients) < 2) {
+            return [];
+        }
+
+        try {
+            $startedAt = microtime(true);
+            $responses = Http::pool(function (Pool $pool) use ($clients) {
+                foreach ($clients as $id => $client) {
+                    try {
+                        $client->addPlaybackStateRequest($pool, (string) $id);
+                    } catch (SpotifyRequestFailed) {
+                        // An account that needs reconnecting is left to its own tick, which knows what to do about it.
+                    }
+                }
+            });
+            $finishedAt = microtime(true);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+
+        $answers = [];
+
+        foreach ($clients as $id => $client) {
+            $response = $responses[(string) $id] ?? null;
+
+            if ($response instanceof Response) {
+                $took = $response->transferStats?->getTransferTime() ?? ($finishedAt - $startedAt);
+                $answers[$id] = ['response' => $response, 'at' => ($startedAt + $took / 2) * 1000];
+            }
+        }
+
+        return $answers;
     }
 
     /** Is this a room the watcher can look at (a real Spotify, still connected)? */
@@ -68,7 +158,7 @@ class RoomWatcher
      * One poll of one room. Returns the seconds to wait before the next one (never below
      * the burst interval), or null when the room no longer needs watching.
      */
-    public function tick(Room $room): ?float
+    public function tick(Room $room, ?array $prefetched = null): ?float
     {
         $room = Room::with('playbackProvider.spotifyAccount')->find($room->id);
 
@@ -79,7 +169,9 @@ class RoomWatcher
         $client = $this->clients->forRoom($room);
 
         try {
-            $state = $client->getPlaybackState();
+            $state = $prefetched && $client instanceof SpotifyWebApiClient
+                ? $client->playbackStateFrom($prefetched['response'], $prefetched['at'])
+                : $client->getPlaybackState();
         } catch (SpotifyRequestFailed $e) {
             return $this->backoff($room, $e);
         }
@@ -151,9 +243,17 @@ class RoomWatcher
 
         if ($trackChanged || $queueStale) {
             try {
-                WatchState::putQueue($room, $client->getQueue(fresh: true));
+                $before = WatchState::queue($room);
+                $queue = $client->getQueue(fresh: true);
+                WatchState::putQueue($room, $queue);
                 Cache::put("watch:queue:fresh:{$room->id}", true, self::QUEUE_REFRESH_SECONDS);
                 Cache::put($trackKey, $state['track_id'] ?? null, 3600);
+
+                // The queue moved on (the song that just started left it) or somebody changed it in the Spotify app.
+                // Screens re-rendered for the track change a moment ago, possibly before this was stored.
+                if ($before !== null && array_column($before, 'id') !== array_column($queue, 'id')) {
+                    RoomUpdated::broadcastFor($room, 'queue');
+                }
             } catch (\Throwable $e) {
                 report($e);
             }

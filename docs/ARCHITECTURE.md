@@ -11,6 +11,9 @@ surprising is learned, delete lines that stop being true.
   Application (`auxroom-application-rqx1zc`), Database (Postgres), Cache (Redis, `auxroom-cache-4kl8vc`).
 - The Application container runs three processes (see `nixpacks.toml`): `php artisan serve`, `reverb:start`
   (websockets, port 8080, reached through the Dokploy domain entry `/app`), and `spotify:watch` in a restart loop.
+- The web server is PHP's built-in one. With the default (one worker) every request waits for the one before it, so a burst (a track
+  change pushes every open screen to re-render at once) was served one at a time. `PHP_CLI_SERVER_WORKERS=6` with `--no-reload` (Laravel
+  only honours the variable with that flag) gives six. Check with `ps aux | grep php`.
 - Deploy: push to `main`, then deploy the application in Dokploy (skill `dokploy`). Migrations run on start.
 - Look at production: `ssh deployment`, then `docker ps | grep auxroom-application` and `docker exec <name> php artisan tinker`.
   Logs go to the container's stderr (`docker logs`), not to a file.
@@ -31,6 +34,19 @@ surprising is learned, delete lines that stop being true.
 - Opening a room that nobody has confirmed lately (a new room, or an unwatched one) makes the page read Spotify once itself
   (`PlaybackSync::refreshIfStale`, guarded by `WatchState::verifiedAge`), so the first render shows the song. A push sent before the page's
   websocket was ready is lost, so `echo.js` announces `realtime-connected` and the room pages re-read once when it comes up.
+- Positions are kept to the millisecond: `rooms.now_playing_started_ms` (the datetime column only holds whole seconds, which made every
+  position up to a second wrong). Setting `now_playing_started_at` fills both through a mutator. `Room::positionAtMs()` and `startedAtMs()`
+  use it. Spotify's `progress_ms` is as of halfway through the request, so `PlaybackSync` pins it to that moment (`fetched_at_ms`).
+  A difference over 800 ms is a jump (pushed to screens); over 300 ms the start is nudged quietly; below that nothing changes.
+- Around a song's end (1.5 s before to 2 s after) the room is read every 0.3 s (`RoomWatcher::aroundTrackEnd`), so the next song shows at once.
+  Rooms that are due together are read in parallel (`RoomWatcher::prefetch`, `Http::pool`), and a Spotify login is refreshed by one process
+  at a time (`SpotifyTokenManager`, a lock), because a refresh token reused after Spotify rotated it flags the account as disconnected.
+- Screens count progress from the server's start time against the server's clock (`resources/js/server-clock.js`, a few pings to `/time`,
+  best round trip wins), so every device shows the same position. `?debug=1` on a room address shows the offsets, pushes and drift.
+- Pushes: events are broadcast under a custom name, so listeners need a leading dot (`echo:room.X,.RoomUpdated`). Without it nothing ever
+  arrived and pages only polled (`EchoEventNamesTest` guards this). Every push carries a per-room number; a page that sees one missing
+  re-reads the room, and while the connection is down or the watcher is not running it re-reads every 4 s (`room-guard.js`). The watcher
+  also pushes when the queue changed. Echo's ping settings are shortened so a dead connection is noticed in about 20 s.
 - If the watcher is dead (`WatchState::watcherAlive()`, heartbeat TTL 15s) pages fall back to polling Spotify themselves
   (host dashboard 10s, party screen 15s). `/health/watcher` reports 503 when the heartbeat or Reverb is down.
 - The live dot in the room header is client side: websocket state plus the server's `watcher-status` event.
