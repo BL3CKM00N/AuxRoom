@@ -47,6 +47,7 @@ class Room extends Model
         'block_explicit',
         'now_playing_artists',
         'now_playing_explicit',
+        'now_playing_tint',
     ];
 
     protected function casts(): array
@@ -61,6 +62,7 @@ class Room extends Model
             'block_explicit' => 'boolean',
             'now_playing_explicit' => 'boolean',
             'now_playing_artists' => 'array',
+            'now_playing_tint' => 'array',
             'location_enforced' => 'boolean',
             'location_lat' => 'float',
             'location_lng' => 'float',

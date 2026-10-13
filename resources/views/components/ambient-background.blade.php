@@ -16,8 +16,10 @@
      Livewire would otherwise reset them every time the page re-renders. A
      plain inline script, not Alpine, so this also works on pages without
      Alpine loaded, like the error pages. --}}
+@props(['tint' => null])
+@php($css = \App\Services\AlbumTint::css($tint))
 <div class="green-waves" aria-hidden="true" wire:ignore>
-    <div class="aurora-parallax">
+    <div class="aurora-parallax {{ $css ? 'is-tinted' : '' }}" @if ($css) style="--tint-hue: {{ $css['hue'] }}deg; --tint-sat: {{ $css['sat'] }}" @endif>
         <canvas class="aurora-layer" width="1392" height="870" data-src="{{ asset('images/aurora-a.jpg') }}"></canvas>
         <canvas class="aurora-layer aurora-layer-b" width="1392" height="870" data-src="{{ asset('images/aurora-b.jpg') }}"></canvas>
     </div>
@@ -47,6 +49,22 @@
                 }
             };
             image.src = canvas.dataset.src;
+        });
+
+        // The party screen sends the album art's colour with every render (see PartyScreen); a
+        // song change eases the aurora to the new hue. Pages that never send it stay green.
+        window.addEventListener('aurora-tint', (event) => {
+            const { hue, sat } = event.detail || {};
+
+            if (hue === null || hue === undefined) {
+                parallax.classList.remove('is-tinted');
+
+                return;
+            }
+
+            parallax.style.setProperty('--tint-hue', `${hue}deg`);
+            parallax.style.setProperty('--tint-sat', sat);
+            parallax.classList.add('is-tinted');
         });
 
         // Cursor parallax: eases toward the pointer, and the frame loop runs

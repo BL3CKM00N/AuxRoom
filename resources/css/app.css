@@ -129,16 +129,23 @@ input[type='range']::-moz-range-thumb {
 
 /* Oversized (inset: -8%, not 0) so the parallax offset never reveals a hard
    edge. Fades in once both pictures are drawn. */
+/* The tint (party screen only) is a hue shift of the green pictures. It is only set while there is
+   album art to take it from, so every other page keeps `filter: none` and pays nothing for it. */
 .aurora-parallax {
     position: absolute;
     inset: -8%;
     opacity: 0;
-    transition: opacity 1.2s ease;
+    transition: opacity 1.2s ease, filter 1.6s ease;
     will-change: transform;
 }
 
+
 .aurora-parallax.is-ready {
     opacity: 1;
+}
+
+.aurora-parallax.is-tinted {
+    filter: hue-rotate(var(--tint-hue, 0deg)) saturate(var(--tint-sat, 1));
 }
 
 .aurora-layer {

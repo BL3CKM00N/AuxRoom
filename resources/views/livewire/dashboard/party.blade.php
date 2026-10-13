@@ -54,7 +54,7 @@
         }
     </style>
 
-    <x-ambient-background />
+    <x-ambient-background :tint="$room->now_playing_tint" />
 
     {{-- No pointer-events-none here: the only thing that brings faded
          controls back is a mousemove, so if the cursor is already resting on

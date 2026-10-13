@@ -5,6 +5,7 @@ namespace App\Services\Spotify;
 use App\Events\RoomUpdated;
 use App\Models\ActivityEvent;
 use App\Models\PlayedTrack;
+use App\Services\AlbumTint;
 use App\Models\Room;
 use Illuminate\Support\Carbon;
 
@@ -115,6 +116,8 @@ class PlaybackSync
         $detailsMissing = $room->now_playing_artists === null && ! empty($state['artists']);
 
         if (! $detailsMissing && ! $wasInactive && ! $volumeChanged && ! $contextChanged && ! $drifted && ! $playStateChanged && ! $fallbackFlagChanged && ! $trackChanged && ! $shuffleChanged && ! $repeatChanged) {
+            $this->tint($room);
+
             return;
         }
 
@@ -142,6 +145,20 @@ class PlaybackSync
         ]);
 
         RoomUpdated::broadcastFor($room, 'playback');
+
+        $this->tint($room);
+    }
+
+    /** The aurora colour for the art on screen. After the broadcast, so working it out never delays a track change. */
+    private function tint(Room $room): void
+    {
+        try {
+            if (app(AlbumTint::class)->ensure($room)) {
+                RoomUpdated::broadcastFor($room, 'tint');
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

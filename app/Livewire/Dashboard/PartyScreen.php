@@ -7,6 +7,7 @@ use App\Models\Room;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\UpcomingQueue;
 use App\Services\Spotify\WatchState;
+use App\Services\AlbumTint;
 use App\Support\SharePreview;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -81,6 +82,9 @@ class PartyScreen extends Component
         );
 
         $this->dispatch('watcher-status', alive: WatchState::watcherAlive());
+
+        $css = AlbumTint::css($this->room->now_playing_tint);
+        $this->dispatch('aurora-tint', hue: $css['hue'] ?? null, sat: $css['sat'] ?? null);
 
         return view('livewire.dashboard.party')
             ->layout('layouts.room', ['title' => 'Party screen', 'preview' => SharePreview::forParty($this->room)]);
