@@ -42,6 +42,23 @@ class AlbumTint
     }
 
     /**
+     * The accent colour for the party screen's bar and labels: the cover's hue at a lightness that reads on the
+     * dark background, never muddier than 45% saturation. A black and white cover gets a soft white.
+     */
+    public static function accent(?array $tint): ?string
+    {
+        if (! $tint || ! isset($tint['h'], $tint['s'])) {
+            return null;
+        }
+
+        if ($tint['s'] < 12) {
+            return 'hsl(0 0% 88%)';
+        }
+
+        return sprintf('hsl(%d %d%% 62%%)', $tint['h'], max(45, min(90, $tint['s'])));
+    }
+
+    /**
      * Makes sure the room's tint belongs to the album art it is showing. Cheap when it already does.
      * Returns true when the room changed (so callers can tell screens).
      */

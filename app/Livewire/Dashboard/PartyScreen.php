@@ -85,6 +85,7 @@ class PartyScreen extends Component
 
         $css = AlbumTint::css($this->room->now_playing_tint);
         $this->dispatch('aurora-tint', hue: $css['hue'] ?? null, sat: $css['sat'] ?? null);
+        $this->dispatch('party-accent', color: AlbumTint::accent($this->room->now_playing_tint));
 
         return view('livewire.dashboard.party')
             ->layout('layouts.room', ['title' => 'Party screen', 'preview' => SharePreview::forParty($this->room)]);

@@ -58,6 +58,7 @@ surprising is learned, delete lines that stop being true.
   Only the host: settings, rules, permissions, promote, close, Spotify account, remove staff. `revokeAllAccess` also removes co-hosts.
 - Album-art aurora on the party screen: the server works out the cover's hue once (`AlbumTint`, Spotify image hosts only, after the
   track change is broadcast) and the page rotates the green aurora with a CSS filter. Only `.is-tinted` pays for the filter.
+  The party screen's progress bar and labels use the same colour as `--party-accent` (`AlbumTint::accent`, set on the screen's root).
 
 ## Cache, sessions, auth
 

@@ -144,6 +144,24 @@ input[type='range']::-moz-range-thumb {
     opacity: 1;
 }
 
+/* The party screen's progress bar and labels: the album art's colour (--party-accent, set on the
+   screen's root), green when there is none. */
+.party-accent-bg {
+    background-color: var(--party-accent, #22c55e);
+    transition: background-color 1.6s ease;
+}
+
+.party-accent-text {
+    color: var(--party-accent, #22c55e);
+    transition: color 1.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .party-accent-bg, .party-accent-text {
+        transition: none;
+    }
+}
+
 .aurora-parallax.is-tinted {
     filter: hue-rotate(var(--tint-hue, 0deg)) saturate(var(--tint-sat, 1));
 }

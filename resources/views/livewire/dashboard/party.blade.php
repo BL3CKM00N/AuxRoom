@@ -1,5 +1,6 @@
 <div wire:poll.15s="poll" x-on:app-resumed.window="$wire.poll()"
      x-data="{
+        accent: @js(\App\Services\AlbumTint::accent($room->now_playing_tint)),
         isTouch: matchMedia('(pointer: coarse)').matches,
         controlsVisible: true,
         isFullscreen: false,
@@ -34,6 +35,8 @@
         resetIdleTimer();
         document.addEventListener('fullscreenchange', () => { isFullscreen = !!document.fullscreenElement; });
      "
+     x-on:party-accent.window="accent = $event.detail.color"
+     :style="accent ? '--party-accent: ' + accent : ''"
      x-on:mousemove.window="resetIdleTimer()"
      x-on:touchstart.window="resetIdleTimer()"
      :class="controlsVisible ? '' : 'cursor-none'"
@@ -109,7 +112,7 @@
             @endif
         </div>
 
-        <p class="mt-8 text-xs lg:text-sm font-semibold uppercase tracking-widest text-aux-accent">
+        <p class="mt-8 text-xs lg:text-sm font-semibold uppercase tracking-widest party-accent-text">
             {{ $spotifyDisconnected ? 'Spotify disconnected' : ($this->nowPlaying ? 'Currently spinning' : ($noDeviceAvailable ? 'No device found' : ($playlistFinished ? 'Playlist finished' : 'Waiting for the first track'))) }}
         </p>
         <h1 class="mt-2 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold max-w-3xl lg:max-w-5xl">{{ $this->nowPlaying->name ?? ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($noDeviceAvailable ? "Nothing's playing anywhere" : ($playlistFinished ? 'End of the playlist' : 'AuxRoom'))) }}</h1>
@@ -125,7 +128,7 @@
                  x-init="sync({ positionMs: {{ $this->currentPositionMs }}, durationMs: {{ $this->nowPlaying->duration_ms ?? 0 }}, isPlaying: {{ $room->is_playing ? 'true' : 'false' }} })"
                  x-on:playback-sync.window="sync($event.detail)">
                 <div class="h-1.5 lg:h-2 bg-white/10 rounded-full overflow-hidden">
-                    <div class="h-full bg-aux-accent" :style="`width: ${seekPct}%`"></div>
+                    <div class="h-full party-accent-bg" :style="`width: ${seekPct}%`"></div>
                 </div>
                 <div class="mt-2 flex justify-between text-[0.6875rem] lg:text-sm text-aux-faint">
                     <span x-text="formatMs(positionMs)"></span>
@@ -143,7 +146,7 @@
         @elseif ($this->upNext->isNotEmpty())
             {{-- Wide enough on big screens for all four cards in one row (4 x 20rem + gaps); it still wraps where the screen is narrower. --}}
             <div class="mt-12 w-full max-w-2xl lg:max-w-[88rem]">
-                <p class="flex items-center justify-center gap-2 text-xs lg:text-sm font-semibold uppercase tracking-widest text-aux-accent">
+                <p class="flex items-center justify-center gap-2 text-xs lg:text-sm font-semibold uppercase tracking-widest party-accent-text">
                     <x-icon name="queue-list" class="w-4 h-4" /> Up next
                 </p>
                 <div class="mt-4 flex flex-wrap justify-center gap-3 lg:gap-4">

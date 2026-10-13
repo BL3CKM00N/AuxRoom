@@ -84,6 +84,28 @@ class AlbumTintTest extends TestCase
         $this->assertNull(AlbumTint::css(['src' => 'x', 'h' => null, 's' => null]));
     }
 
+    public function test_the_accent_colour_is_readable_and_never_muddy(): void
+    {
+        $this->assertSame('hsl(8 85% 62%)', AlbumTint::accent(['h' => 8, 's' => 85]));
+        $this->assertSame('hsl(220 45% 62%)', AlbumTint::accent(['h' => 220, 's' => 20]), 'a pale cover still gets a clear colour');
+        $this->assertSame('hsl(120 90% 62%)', AlbumTint::accent(['h' => 120, 's' => 100]), 'and a neon one is held back');
+        $this->assertSame('hsl(0 0% 88%)', AlbumTint::accent(['h' => 0, 's' => 0]), 'black and white covers get a soft white');
+        $this->assertNull(AlbumTint::accent(null));
+        $this->assertNull(AlbumTint::accent(['src' => 'x', 'h' => null, 's' => null]));
+    }
+
+    public function test_the_party_screen_shows_the_covers_colour_on_its_bar_and_tells_the_page_when_it_changes(): void
+    {
+        $room = $this->room(['now_playing_track_id' => 't1', 'now_playing_name' => 'Song', 'now_playing_artist' => 'Band', 'now_playing_duration_ms' => 100000,
+            'now_playing_tint' => ['src' => 'x', 'h' => 8, 's' => 85], 'is_playing' => true, 'now_playing_started_at' => now()]);
+
+        Livewire::test(PartyScreen::class, ['room' => $room])->assertDispatched('party-accent', color: 'hsl(8 85% 62%)');
+
+        $page = $this->get(route('rooms.party', $room))->getContent();
+        $this->assertStringContainsString('hsl(8 85% 62%)', $page);
+        $this->assertStringContainsString('party-accent-bg', $page);
+    }
+
     public function test_it_works_out_a_rooms_tint_once_per_picture(): void
     {
         Cache::flush();
