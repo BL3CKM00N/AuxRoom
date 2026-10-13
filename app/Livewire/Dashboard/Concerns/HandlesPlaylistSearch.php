@@ -3,7 +3,9 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Models\Room;
+use App\Services\Queue\QueueFeeder;
 use App\Services\Queue\QueueRules;
+use App\Services\Spotify\WatchState;
 use App\Services\Spotify\SpotifyClientFactory;
 use Livewire\Attributes\Locked;
 
@@ -68,6 +70,36 @@ trait HandlesPlaylistSearch
         $this->searchResults = app(SpotifyClientFactory::class)->forRoom($this->room)->search($query, 8);
     }
 
+    /**
+     * Takes a song out of the queue. A song still on the waiting list simply goes. One already handed to
+     * Spotify cannot be taken back from it, so it is hidden and skipped the moment it starts. The host and
+     * co-hosts can remove anything; a guest only their own songs.
+     */
+    public function removeFromQueue(int $itemId): void
+    {
+        if (! $this->isApproved) {
+            return;
+        }
+
+        $item = $this->room->queueItems()->whereKey($itemId)->whereNull('played_at')->whereNull('removed_at')->first();
+
+        if (! $item || (! $this->canManage && $item->added_by_id !== $this->member->id)) {
+            return;
+        }
+
+        $handedOver = $item->released_at !== null;
+        $handedOver ? $item->update(['removed_at' => now()]) : $item->delete();
+
+        $this->logActivity('queued', "{$this->member->display_name} removed \"{$item->name}\" from the queue.");
+
+        // Something real has to follow a removed song that Spotify still has.
+        if ($handedOver) {
+            app(QueueFeeder::class)->feed($this->room);
+        }
+
+        $this->broadcastUpdate('queue');
+    }
+
     public function dismissRuleWarning(): void
     {
         $this->ruleWarning = null;
@@ -109,6 +141,12 @@ trait HandlesPlaylistSearch
 
         $nextPosition = (int) ($this->room->queueItems()->max('position') ?? 0) + 1;
 
+        $nothingPlaying = ! $this->room->now_playing_track_id && ! $this->room->is_playing;
+
+        // With the waiting list on, the song waits here and the watcher hands it to Spotify when it is its turn.
+        // Without the watcher there is nothing to hand it over later, so it goes straight in as before.
+        $hold = $this->room->waiting_list_enabled && ! $nothingPlaying && ! $this->isMock && WatchState::watcherAlive();
+
         $item = $this->room->queueItems()->create([
             'added_by_id' => $this->member->id,
             'spotify_track_id' => $track['id'],
@@ -117,15 +155,18 @@ trait HandlesPlaylistSearch
             'album_art_url' => $track['album_art_url'],
             'duration_ms' => $track['duration_ms'],
             'position' => $nextPosition,
+            'released_at' => $hold ? null : now(),
             'artists' => $track['artists'] ?? [],
             'explicit' => (bool) ($track['explicit'] ?? false),
         ]);
 
         $this->logActivity('queued', "{$this->member->display_name} added \"{$item->name}\" to the queue".($overridden ? ' (past a queue rule).' : '.')); 
 
-        if (! $this->room->now_playing_track_id && ! $this->room->is_playing) {
+        if ($nothingPlaying) {
             // Nothing playing at all yet — this is the first song, so start it.
             $this->startPlayback($item);
+        } elseif ($hold) {
+            app(QueueFeeder::class)->feed($this->room);
         } else {
             // Something's already playing (a queued track or the fallback
             // playlist) — queue this one to play next without interrupting

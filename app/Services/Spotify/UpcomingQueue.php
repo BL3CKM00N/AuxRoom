@@ -3,6 +3,7 @@
 namespace App\Services\Spotify;
 
 use App\Models\Room;
+use App\Services\Queue\QueueFeeder;
 
 /**
  * What is genuinely coming up, from Spotify's raw queue.
@@ -19,7 +20,7 @@ use App\Models\Room;
  */
 class UpcomingQueue
 {
-    public function __construct(private SpotifyClientFactory $clients) {}
+    public function __construct(private SpotifyClientFactory $clients, private QueueFeeder $feeder) {}
 
     /**
      * @return array<int, array{id: string, uri: ?string, name: string, artist: string, album_art_url: ?string, duration_ms: int, is_queued: bool}>
@@ -52,13 +53,80 @@ class UpcomingQueue
             ? ($watched ? ($client->peekContextTrackIds($context) ?? $client->getContextTrackIds($context)) : $client->getContextTrackIds($context))
             : null;
 
-        return self::trim(
+        // Only songs already handed to Spotify are in its queue; the rest wait on AuxRoom's list.
+        $inSpotify = $room->queueItems()->released()->whereNull('played_at')->orderBy('released_at')->orderBy('id')->get();
+
+        return $this->withQueueItems($room, self::trim(
             $queue,
             $room->now_playing_track_id,
             $room->repeat_mode ?: 'off',
             $contextIds,
-            $room->queueItems()->whereNull('played_at')->pluck('spotify_track_id')->all(),
-        );
+            $inSpotify->pluck('spotify_track_id')->all(),
+        ), $inSpotify);
+    }
+
+    /**
+     * Ties the guests' songs to what Spotify reports: each queued entry knows which song of the room it is
+     * (so it can be removed and credited), songs removed while already in Spotify's queue are hidden, a song
+     * just handed over that Spotify's answer does not list yet still shows, and the waiting list follows the
+     * queued songs, ahead of the playlist's own tracks.
+     *
+     * @param  array<int, array>  $trimmed
+     * @param  \Illuminate\Support\Collection<int, \App\Models\QueueItem>  $inSpotify
+     * @return array<int, array>
+     */
+    private function withQueueItems(Room $room, array $trimmed, $inSpotify): array
+    {
+        $unmatched = $inSpotify->values();
+        $queued = [];
+        $rest = [];
+
+        foreach ($trimmed as $track) {
+            if (! $track['is_queued']) {
+                $rest[] = $track + ['item_id' => null, 'added_by_id' => null, 'waiting' => false, 'locked' => false];
+
+                continue;
+            }
+
+            $index = $unmatched->search(fn ($item) => $item->spotify_track_id === $track['id']);
+            $item = $index === false ? null : $unmatched->pull($index);
+
+            // Removed while in Spotify's queue: still there until it starts (then it is skipped), but not shown.
+            if ($item?->removed_at) {
+                continue;
+            }
+
+            $queued[] = $track + ['item_id' => $item?->id, 'added_by_id' => $item?->added_by_id, 'waiting' => false, 'locked' => true];
+        }
+
+        // Handed over a moment ago, and Spotify's answer is older than that.
+        foreach ($unmatched->whereNull('removed_at') as $item) {
+            $queued[] = $this->entry($item, waiting: false);
+        }
+
+        $waiting = $room->waiting_list_enabled
+            ? $this->feeder->waiting($room)->map(fn ($item) => $this->entry($item, waiting: true))->all()
+            : [];
+
+        return [...$queued, ...$waiting, ...$rest];
+    }
+
+    /** @return array<string, mixed> */
+    private function entry($item, bool $waiting): array
+    {
+        return [
+            'id' => $item->spotify_track_id,
+            'uri' => 'spotify:track:'.$item->spotify_track_id,
+            'name' => $item->name,
+            'artist' => $item->artist,
+            'album_art_url' => $item->album_art_url,
+            'duration_ms' => (int) $item->duration_ms,
+            'is_queued' => true,
+            'item_id' => $item->id,
+            'added_by_id' => $item->added_by_id,
+            'waiting' => $waiting,
+            'locked' => ! $waiting,
+        ];
     }
 
     /**

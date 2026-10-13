@@ -87,7 +87,7 @@ class SkipPredictionTest extends TestCase
     {
         $room = $this->room();
         $member = $room->members()->first();
-        $item = $room->queueItems()->create(['added_by_id' => $member->id, 'spotify_track_id' => 't2', 'name' => 'Bravo Ballad', 'artist' => 'Nobody', 'duration_ms' => 180000, 'position' => 1]);
+        $item = $room->queueItems()->create(['added_by_id' => $member->id, 'spotify_track_id' => 't2', 'name' => 'Bravo Ballad', 'artist' => 'Nobody', 'duration_ms' => 180000, 'position' => 1, 'released_at' => now()]);
         WatchState::beat();
 
         Livewire::actingAs($room->host)->test(ShowRoom::class, ['room' => $room])->call('skip');

@@ -15,6 +15,7 @@ use App\Livewire\Dashboard\Concerns\ResolvesSpotifyDevices;
 use App\Models\ActivityEvent;
 use App\Models\Room;
 use App\Models\RoomMember;
+use App\Services\Queue\QueueFeeder;
 use App\Services\RoomMembership;
 use App\Services\Spotify\SpotifyCheck;
 use App\Services\Spotify\UpcomingQueue;
@@ -156,6 +157,11 @@ class ShowRoom extends Component
             $this->syncWithSpotify();
         }
 
+        // Nothing else hands waiting songs to Spotify while the watcher is down. The host's open page does.
+        if ($this->isHost && ! WatchState::watcherAlive()) {
+            app(QueueFeeder::class)->feed($this->room);
+        }
+
         return null;
     }
 
@@ -244,6 +250,7 @@ class ShowRoom extends Component
         // Who queued what, for attribution only. One lookup for the whole list.
         $addedBy = $this->room->queueItems()
             ->whereNull('played_at')
+            ->whereNull('removed_at')
             ->whereIn('spotify_track_id', $upcoming->pluck('id'))
             ->with('addedBy')
             ->get()
@@ -257,6 +264,10 @@ class ShowRoom extends Component
             'duration_ms' => $track['duration_ms'],
             'added_by_name' => $track['is_queued'] ? $addedBy->get($track['id'])?->first()?->addedBy?->display_name : null,
             'is_queued' => $track['is_queued'],
+            'item_id' => $track['item_id'] ?? null,
+            'added_by_id' => $track['added_by_id'] ?? null,
+            'waiting' => $track['waiting'] ?? false,
+            'locked' => $track['locked'] ?? false,
         ]);
     }
 

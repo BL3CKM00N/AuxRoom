@@ -82,7 +82,7 @@ class QueueRules
 
         $recent = PlayedTrack::where('room_id', $room->id)->orderByDesc('id')->limit($window)->pluck('spotify_track_id');
 
-        $waiting = QueueItem::where('room_id', $room->id)->whereNull('played_at')->pluck('spotify_track_id');
+        $waiting = QueueItem::where('room_id', $room->id)->whereNull('played_at')->whereNull('removed_at')->pluck('spotify_track_id');
 
         $taken = $recent->merge($waiting)->push($room->now_playing_track_id)->filter();
 
@@ -102,7 +102,7 @@ class QueueRules
             return null;
         }
 
-        $waiting = QueueItem::where('room_id', $room->id)->where('added_by_id', $member->id)->whereNull('played_at')->count();
+        $waiting = QueueItem::where('room_id', $room->id)->where('added_by_id', $member->id)->whereNull('played_at')->whereNull('removed_at')->count();
 
         if ($waiting >= $limit) {
             $songs = $limit === 1 ? '1 song' : "{$limit} songs";

@@ -224,6 +224,25 @@
             <p class="text-xs text-aux-faint mt-1">Apply to guests when they add songs. You and your co-hosts get a warning with Add anyway. A guest can be exempted in the Guests tab.</p>
 
             <div class="mt-4 space-y-4">
+                <div class="space-y-3">
+                    <button wire:click="toggleWaitingList" class="w-full flex items-start justify-between gap-3 text-left">
+                        <span class="text-xs text-aux-muted">Waiting list
+                            <span class="block text-aux-faint mt-0.5">Guests' songs wait here and go to Spotify one at a time. That lets anyone remove a song they added, and lets you take turns between guests. The song coming up next is already in Spotify, so it can only be skipped.</span>
+                        </span>
+                        <span class="relative mt-0.5 inline-flex h-5 w-9 items-center rounded-full transition shrink-0 {{ $room->waiting_list_enabled ? 'bg-aux-accent' : 'bg-white/10' }}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition {{ $room->waiting_list_enabled ? 'translate-x-[18px]' : 'translate-x-0.5' }}"></span>
+                        </span>
+                    </button>
+                    <button wire:click="toggleRotation" @disabled(! $room->waiting_list_enabled) class="w-full flex items-start justify-between gap-3 text-left disabled:opacity-40">
+                        <span class="text-xs text-aux-muted">Take turns between guests
+                            <span class="block text-aux-faint mt-0.5">{{ $room->waiting_list_enabled ? 'One song per guest in turn, so one person cannot play five in a row.' : 'Needs the waiting list.' }}</span>
+                        </span>
+                        <span class="relative mt-0.5 inline-flex h-5 w-9 items-center rounded-full transition shrink-0 {{ $room->rotation_enabled && $room->waiting_list_enabled ? 'bg-aux-accent' : 'bg-white/10' }}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition {{ $room->rotation_enabled && $room->waiting_list_enabled ? 'translate-x-[18px]' : 'translate-x-0.5' }}"></span>
+                        </span>
+                    </button>
+                </div>
+
                 <div>
                     <p class="text-xs text-aux-muted mb-1.5">Songs waiting per guest</p>
                     <div class="flex flex-wrap gap-1.5">

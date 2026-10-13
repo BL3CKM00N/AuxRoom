@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Models\QueueItem;
+use App\Services\Queue\QueueFeeder;
 use App\Services\Spotify\PlaybackPrediction;
 use App\Services\Spotify\PlaybackSync;
 use App\Services\Spotify\SpotifyClientFactory;
@@ -87,7 +88,7 @@ trait HandlesPlayback
             return;
         }
 
-        $next = $this->room->pendingQueueItems()->first();
+        $next = app(QueueFeeder::class)->next($this->room) ?? $this->room->pendingQueueItems()->first();
 
         if ($next) {
             $this->startPlayback($next);
@@ -147,6 +148,11 @@ trait HandlesPlayback
 
         $watcherRuns = WatchState::watcherAlive();
         $fromTrack = $this->room->now_playing_track_id;
+
+        // With the waiting list on, a song must already be in Spotify's queue for the skip to land on it.
+        if ($watcherRuns && $this->room->waiting_list_enabled) {
+            app(QueueFeeder::class)->feed($this->room);
+        }
 
         // What a skip will play, worked out before the command: the queue is cleared by it.
         $predicted = $watcherRuns && PlaybackPrediction::possible($this->room) ? $this->queue->first() : null;
@@ -395,6 +401,8 @@ trait HandlesPlayback
 
     private function startPlayback(QueueItem $item): bool
     {
+        $item->released_at ?? $item->update(['released_at' => now()]);
+
         if (! $this->playTrackAt($item->spotify_track_id, $item->name, $item->artist, $item->album_art_url, $item->duration_ms, 0, $item->id)) {
             return false;
         }

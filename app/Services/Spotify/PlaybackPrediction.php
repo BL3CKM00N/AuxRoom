@@ -24,7 +24,7 @@ class PlaybackPrediction
     public function apply(Room $room, object $next): void
     {
         // A song a guest queued is used up the moment it plays; the same bookkeeping PlaybackSync does.
-        $matched = $room->queueItems()->where('spotify_track_id', $next->spotify_track_id)->whereNull('played_at')->first();
+        $matched = $room->queueItems()->released()->where('spotify_track_id', $next->spotify_track_id)->whereNull('played_at')->orderBy('released_at')->orderBy('id')->first();
         $matched?->update(['played_at' => now()]);
 
         PlayedTrack::record($room, $next->spotify_track_id);

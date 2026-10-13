@@ -3,6 +3,7 @@
 namespace App\Services\Spotify;
 
 use App\Models\Room;
+use App\Services\Queue\QueueFeeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -36,7 +37,7 @@ class RoomWatcher
 
     private const DEVICES_REFRESH_SECONDS = 10;
 
-    public function __construct(private PlaybackSync $sync, private SpotifyClientFactory $clients) {}
+    public function __construct(private PlaybackSync $sync, private SpotifyClientFactory $clients, private QueueFeeder $feeder) {}
 
     /** Seconds until this room should be polled again, or null when nobody needs it. */
     public function cadence(Room $room): ?float
@@ -101,11 +102,22 @@ class RoomWatcher
         }
 
         $this->sync->applyState($room, $state);
+        $this->afterSync($room);
         $this->refreshLists($room, $client, $state);
 
         $next = $this->cadence($room);
 
         return $next === null ? null : max(self::BURST_INTERVAL, $next);
+    }
+
+    /** The waiting list's part of a tick (see QueueFeeder::afterSync). A failure there never stops the watcher. */
+    private function afterSync(Room $room): void
+    {
+        try {
+            $this->feeder->afterSync($room);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

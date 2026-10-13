@@ -216,7 +216,18 @@
                             <p class="truncate text-sm font-medium">{{ $item->name }}</p>
                             <p class="truncate text-xs text-aux-faint">{{ $item->artist }}{{ $item->added_by_name ? ' · added by '.$item->added_by_name : '' }}</p>
                         </div>
+                        @if ($room->waiting_list_enabled && $item->is_queued)
+                            <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide {{ $item->waiting ? 'bg-white/5 text-aux-faint' : 'bg-aux-accent-soft text-aux-accent' }}"
+                                  title="{{ $item->waiting ? 'Waiting here. It goes to Spotify when it is next.' : 'Already in Spotify, so it plays next and can only be skipped.' }}">
+                                {{ $item->waiting ? 'Waiting' : 'Next up' }}
+                            </span>
+                        @endif
                         <span class="shrink-0 text-xs text-aux-faint">{{ gmdate('i:s', intdiv($item->duration_ms, 1000)) }}</span>
+                        @if ($item->item_id && ($this->canManage || ($this->member && $item->added_by_id === $this->member->id)))
+                            <button type="button" wire:click="removeFromQueue({{ $item->item_id }})" class="shrink-0 text-aux-faint hover:text-red-400" aria-label="Remove from queue" title="Remove from the queue">
+                                <x-icon name="x-mark" class="w-4 h-4" />
+                            </button>
+                        @endif
                     </li>
                 @empty
                     <li class="py-6 text-center text-sm text-aux-faint">Queue is empty. Add the first track.</li>

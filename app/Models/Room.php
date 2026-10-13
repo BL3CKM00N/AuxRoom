@@ -48,6 +48,8 @@ class Room extends Model
         'now_playing_artists',
         'now_playing_explicit',
         'now_playing_tint',
+        'waiting_list_enabled',
+        'rotation_enabled',
     ];
 
     protected function casts(): array
@@ -60,6 +62,8 @@ class Room extends Model
             'smart_shuffle_enabled' => 'boolean',
             'volume_supported' => 'boolean',
             'block_explicit' => 'boolean',
+            'waiting_list_enabled' => 'boolean',
+            'rotation_enabled' => 'boolean',
             'now_playing_explicit' => 'boolean',
             'now_playing_artists' => 'array',
             'now_playing_tint' => 'array',
@@ -161,7 +165,7 @@ class Room extends Model
 
     public function pendingQueueItems(): HasMany
     {
-        return $this->queueItems()->whereNull('played_at')->orderBy('position');
+        return $this->queueItems()->whereNull('played_at')->whereNull('removed_at')->orderBy('position');
     }
 
     public function blockedItems(): HasMany

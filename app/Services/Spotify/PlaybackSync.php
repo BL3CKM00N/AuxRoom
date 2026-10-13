@@ -8,6 +8,7 @@ use App\Models\PlayedTrack;
 use App\Services\AlbumTint;
 use App\Models\Room;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Detects playback changes made outside AuxRoom — pausing, seeking, or
@@ -81,11 +82,17 @@ class PlaybackSync
             // source of truth for order and content, never reconstructed
             // locally (that's what caused the queue to go backwards before).
             $matched = $state['track_id']
-                ? $room->queueItems()->where('spotify_track_id', $state['track_id'])->whereNull('played_at')->first()
+                ? $room->queueItems()->released()->where('spotify_track_id', $state['track_id'])->whereNull('played_at')->orderBy('released_at')->orderBy('id')->first()
                 : null;
 
             $matched?->update(['played_at' => now()]);
             $queueItemId = $matched?->id;
+
+            // Whether this change cut the last song short (a skip), for the waiting list to tell a skip from a song ending.
+            Cache::put("track-change:{$room->id}", [
+                'track' => $state['track_id'],
+                'early' => $room->now_playing_duration_ms > 0 && $room->currentPositionMs() < $room->now_playing_duration_ms - 6000,
+            ], 15);
 
             if (! $finished) {
                 PlayedTrack::record($room, $state['track_id']);

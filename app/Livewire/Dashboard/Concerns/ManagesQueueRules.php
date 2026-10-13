@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard\Concerns;
 
 use App\Models\RoomMember;
+use App\Services\Queue\QueueFeeder;
 
 /**
  * The host's side of the queue rules (see QueueRules): the limit per guest, the duplicate guard,
@@ -38,6 +39,42 @@ trait ManagesQueueRules
         $this->room->update(['duplicate_guard_tracks' => $tracks]);
         $this->logActivity('settings', $tracks ? "Host turned on the duplicate guard for the last {$tracks} tracks." : 'Host turned off the duplicate guard.');
         $this->broadcastUpdate('settings');
+    }
+
+    /**
+     * Songs wait on AuxRoom's list and go to Spotify one at a time (see QueueFeeder). Switching it off hands
+     * everything waiting to Spotify at once, so nothing is lost.
+     */
+    public function toggleWaitingList(): void
+    {
+        if (! $this->isHost) {
+            return;
+        }
+
+        $on = ! $this->room->waiting_list_enabled;
+        $this->room->update(['waiting_list_enabled' => $on]);
+
+        if ($on) {
+            $this->logActivity('settings', 'Host turned on the waiting list. Songs now wait here and go to Spotify one at a time.');
+        } else {
+            $moved = app(QueueFeeder::class)->flush($this->room);
+            $this->logActivity('settings', 'Host turned off the waiting list.'.($moved ? " {$moved} waiting ".($moved === 1 ? 'song was' : 'songs were').' sent to Spotify.' : ''));
+        }
+
+        $this->broadcastUpdate('queue');
+    }
+
+    /** Waiting songs go out one per guest in turn. Only does something while the waiting list is on. */
+    public function toggleRotation(): void
+    {
+        if (! $this->isHost || ! $this->room->waiting_list_enabled) {
+            return;
+        }
+
+        $on = ! $this->room->rotation_enabled;
+        $this->room->update(['rotation_enabled' => $on]);
+        $this->logActivity('settings', $on ? 'Host turned on rotation. Guests take turns.' : 'Host turned off rotation.');
+        $this->broadcastUpdate('queue');
     }
 
     public function toggleBlockExplicit(): void
