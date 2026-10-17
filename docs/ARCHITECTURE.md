@@ -101,6 +101,9 @@ surprising is learned, delete lines that stop being true.
 - Test sessions use the array driver; set `session.driver` to `database` for device-list tests.
 - The first browser run right after a PHP run can time out; run it again.
 - `pint --test` already fails on old files; do not mass-reformat.
+- Rate limits must have names (`RateLimiter::for` in `AppServiceProvider`). A numbered `throttle:10,1` counts per visitor across *all* routes
+  that use one, so the page's clock pings used up the join form's allowance and guests got a 429 (`ThrottleBucketsTest`). The join limit is
+  60 a minute per address so a party on one Wi-Fi fits.
 - In a Livewire update request (a refresh or a wire:click) `request()->routeIs()` and `request()->query()` describe Livewire's own
   request, not the page. Anything that polls and depends on the page (the nav) must remember it at mount (`NavigationRefreshTest`).
 

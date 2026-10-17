@@ -18,15 +18,15 @@ Route::get('/help', HelpController::class)->name('help');
 
 // The server's clock, for resources/js/server-clock.js. Light, and many guests can share one address, so the limit is generous.
 Route::get('/time', fn () => response()->json(['now' => round(microtime(true) * 1000, 1)])->header('Cache-Control', 'no-store'))
-    ->middleware('throttle:600,1')->name('time');
+    ->middleware('throttle:clock')->name('time');
 
 // For Uptime Kuma: 503 when the watcher or the websocket server is down. See App\Services\HealthCheck.
-Route::get('/health/watcher', HealthController::class)->middleware('throttle:60,1')->name('health.watcher');
+Route::get('/health/watcher', HealthController::class)->middleware('throttle:health')->name('health.watcher');
 
 // Approving a login on another device. Open to anyone (a logged-out phone gets an explanation); the
 // approving itself needs an account, and is limited. See App\Services\Auth\QrLogin.
 Volt::route('/qr-login/{token}', 'pages.auth.qr-approve')
-    ->middleware('throttle:30,1')
+    ->middleware('throttle:qr-login')
     ->name('qr-login.show');
 
 Route::get('/join', [JoinController::class, 'create'])->name('join');
@@ -34,10 +34,10 @@ Route::get('/join', [JoinController::class, 'create'])->name('join');
 // The invite link's preview picture, fetched by chat apps' link crawlers.
 Route::get('/share/{code}/{shape}.jpg', [ShareImageController::class, 'show'])
     ->where('shape', 'wide|square')
-    ->middleware('throttle:120,1')
+    ->middleware('throttle:share-image')
     ->name('share.image');
 
-Route::post('/join', [JoinController::class, 'store'])->middleware('throttle:10,1')->name('join.store');
+Route::post('/join', [JoinController::class, 'store'])->middleware('throttle:join')->name('join.store');
 
 // Your room, if you're hosting one — otherwise mount() bounces to rooms.create.
 Route::get('/dashboard', ShowRoom::class)

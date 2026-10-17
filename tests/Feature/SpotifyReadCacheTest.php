@@ -105,7 +105,7 @@ class SpotifyReadCacheTest extends TestCase
         $host = User::factory()->create();
         Room::create(['invite_code' => 'AAAAAA-BBBBBB-CCCCCC', 'host_id' => $host->id, 'playback_provider_id' => $host->id]);
 
-        foreach (range(1, 10) as $_) {
+        foreach (range(1, 60) as $_) {
             $this->post('/join', ['name' => 'G', 'invite_code' => 'AAAAAA-BBBBBB-CCCCCC'])->assertRedirect();
         }
 
