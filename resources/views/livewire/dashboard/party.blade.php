@@ -37,6 +37,8 @@
      "
      x-on:party-accent.window="accent = $event.detail.color"
      :style="accent ? '--party-accent: ' + accent : ''"
+     {{-- Drawn with the colour already in place, so the first paint is not green before it eases to the cover's colour. --}}
+     style="{{ ($accent = \App\Services\AlbumTint::accent($room->now_playing_tint)) ? '--party-accent: '.$accent : '' }}"
      x-on:mousemove.window="resetIdleTimer()"
      x-on:touchstart.window="resetIdleTimer()"
      :class="controlsVisible ? '' : 'cursor-none'"
@@ -175,7 +177,7 @@
              limited vertical space. --}}
         <button type="button" x-on:click="showQrPopup = true"
                 class="sm:hidden mt-10 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-aux-card border border-aux-border text-sm font-medium">
-            <x-icon name="qr" class="w-4 h-4 text-aux-accent" /> Join the aux
+            <x-icon name="qr" class="w-4 h-4 party-accent-text" /> Join the aux
         </button>
 
         {{-- Larger screens: small always-visible QR + code in the corner,
@@ -200,7 +202,7 @@
             <button x-on:click="showQrPopup = false" class="absolute top-4 right-4 text-aux-faint hover:text-aux-text">
                 <x-icon name="x-mark" class="w-5 h-5" />
             </button>
-            <p class="text-xs font-semibold uppercase tracking-widest text-aux-accent">Join the aux</p>
+            <p class="text-xs font-semibold uppercase tracking-widest party-accent-text">Join the aux</p>
             <div class="mt-4 p-4 bg-white rounded-xl inline-block">
                 {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(180)->generate(route('join', ['code' => $room->invite_code])) !!}
             </div>

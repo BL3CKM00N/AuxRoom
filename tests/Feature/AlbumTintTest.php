@@ -104,6 +104,20 @@ class AlbumTintTest extends TestCase
         $page = $this->get(route('rooms.party', $room))->getContent();
         $this->assertStringContainsString('hsl(8 85% 62%)', $page);
         $this->assertStringContainsString('party-accent-bg', $page);
+        $this->assertStringContainsString('style="--party-accent: hsl(8 85% 62%)"', $page, 'in the first paint, so it does not start green and ease over');
+    }
+
+    public function test_nothing_on_the_party_screen_is_left_in_the_fixed_green(): void
+    {
+        $room = $this->room(['now_playing_tint' => ['src' => 'x', 'h' => 8, 's' => 85]]);
+
+        $html = $this->get(route('rooms.party', $room))->getContent();
+
+        // Only the bar, labels, the join button and its popup follow the cover; the album tile's frame is a neutral border.
+        preg_match_all('/class="[^"]*\btext-aux-accent\b[^"]*"/', $html, $matches);
+        // The big icon of the "You're offline" overlay is hidden until the connection drops.
+        $visible = array_values(array_filter($matches[0], fn (string $class) => ! str_contains($class, 'w-14 h-14')));
+        $this->assertSame([], $visible, 'a fixed-green accent next to the cover-coloured ones looks like a mistake');
     }
 
     public function test_it_works_out_a_rooms_tint_once_per_picture(): void
