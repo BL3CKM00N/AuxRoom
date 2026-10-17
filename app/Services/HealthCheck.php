@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Room;
+use App\Services\Spotify\SpotifyBudget;
 use App\Services\Spotify\WatchState;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class HealthCheck
             'database' => $this->database(),
             'cache' => $this->cache(),
             'rooms' => $this->rooms(),
+            'spotify' => $this->spotify(),
         ];
 
         return ['ok' => collect($checks)->every(fn (array $check) => $check['ok']), 'checks' => $checks];
@@ -86,6 +88,30 @@ class HealthCheck
             'detail' => "{$watched->count()} watched, {$behind->count()} confirmed with Spotify more than ".self::BEHIND_SECONDS.' seconds ago',
             'watched' => $watched->count(),
             'behind' => $behind->count(),
+        ];
+    }
+
+    /**
+     * Whether Spotify is limiting the app (see SpotifyBudget). That is a failure: nothing in the room can be read or
+     * controlled until it ends, and nobody would otherwise know. Also how many requests were sent this hour.
+     *
+     * @return array{ok: bool, detail: string, limited_seconds: ?int, calls_this_hour: int}
+     */
+    private function spotify(): array
+    {
+        $accounts = Room::whereNull('closed_at')->with('playbackProvider.spotifyAccount')->get()
+            ->map(fn (Room $room) => $room->playbackProvider?->spotifyAccount)->filter()->unique('id');
+
+        $limited = $accounts->map(fn ($account) => SpotifyBudget::playerRemaining($account))->filter()->max();
+        $calls = $accounts->unique('client_id')->sum(fn ($account) => SpotifyBudget::callsThisHour($account));
+
+        return [
+            'ok' => $limited === null,
+            'detail' => $limited === null
+                ? "Not limited. {$calls} requests this hour."
+                : 'Spotify is limiting this app for about '.SpotifyBudget::humanize($limited).". {$calls} requests this hour.",
+            'limited_seconds' => $limited,
+            'calls_this_hour' => $calls,
         ];
     }
 

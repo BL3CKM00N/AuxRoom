@@ -96,10 +96,10 @@ class RoomWatcherTest extends TestCase
         $this->assertNull($watcher->cadence($room), 'nobody has looked: leave it alone');
 
         WatchState::touch($room);
-        $this->assertSame(1.0, $watcher->cadence($room), 'someone is looking: every second');
+        $this->assertSame(RoomWatcher::WATCHED_INTERVAL, $watcher->cadence($room), 'someone is looking and it is playing: the watched pace (2 s)');
 
         $this->travel(WatchState::WATCHING_SECONDS + 5)->seconds();
-        $this->assertSame(5.0, $watcher->cadence($room), 'looked at a little while ago: every five seconds');
+        $this->assertSame(RoomWatcher::RECENT_INTERVAL, $watcher->cadence($room), 'looked at a little while ago: the slow pace (10 s)');
 
         $this->travel(WatchState::RECENT_SECONDS)->seconds();
         $this->assertNull($watcher->cadence($room), 'forgotten again');
@@ -148,7 +148,7 @@ class RoomWatcherTest extends TestCase
         $this->assertSame('t2', $room->now_playing_track_id, 'applied on the very next look');
         $this->assertSame('Bravo Ballad', $room->now_playing_name);
         $this->assertNull(WatchState::burst($room), 'confirmed, so the burst is over');
-        $this->assertSame(1.0, $second, 'and polling settles back to once a second');
+        $this->assertSame(RoomWatcher::WATCHED_INTERVAL, $second, 'and polling settles back to the watched pace');
         Event::assertDispatched(RoomUpdated::class);
     }
 

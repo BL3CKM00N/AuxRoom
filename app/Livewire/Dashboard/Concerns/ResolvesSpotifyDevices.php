@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard\Concerns;
 
+use App\Services\Spotify\SpotifyBudget;
 use App\Services\Spotify\SpotifyClientFactory;
 use App\Services\Spotify\WatchState;
 
@@ -26,6 +27,15 @@ trait ResolvesSpotifyDevices
     public function getSpotifyNeedsReconnectProperty(): bool
     {
         return (bool) $this->room->playbackProvider?->spotifyAccount?->needsReconnect();
+    }
+
+    /**
+     * Seconds Spotify has asked this room's Spotify app to stay away from playback for (its quota ran out), or
+     * null. While it lasts nothing can be read, so "no device" would be a guess: the page says what is going on.
+     */
+    public function getSpotifyLimitedProperty(): ?int
+    {
+        return $this->isMock ? null : SpotifyBudget::playerRemainingForRoom($this->room);
     }
 
     public function getDevicesProperty(): array

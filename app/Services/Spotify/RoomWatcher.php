@@ -22,8 +22,11 @@ use Illuminate\Support\Facades\Log;
  *    Spotify shows the command's effect. A read that still shows the old state is
  *    ignored (Spotify lags a moment behind its own audio), instead of the old
  *    blind spot of ignoring everything for 4 seconds;
- *  - someone is looking (a screen polled in the last 30 s): every second;
- *  - looked at in the last 5 minutes: every 5 seconds;
+ *  - someone is looking (a screen polled in the last 30 s) and music is playing: every 2 seconds, and every
+ *    0.3 s around the end of a song (the position itself is counted from the clock, so a read only has to notice
+ *    what was changed in the Spotify app);
+ *  - looked at, but nothing is playing: every 4 seconds;
+ *  - looked at in the last 5 minutes: every 10 seconds;
  *  - otherwise the room is left alone.
  * Failures back off for as long as Spotify asked (rate limits) or exponentially.
  */
@@ -31,9 +34,27 @@ class RoomWatcher
 {
     public const BURST_INTERVAL = 0.3;
 
-    public const WATCHED_INTERVAL = 1.0;
+    /**
+     * Spotify gives each app a quota for its playback endpoints, and when it runs out it blocks them for hours (see
+     * SpotifyBudget). One room read every second is 86,400 requests a day for as long as a screen is open, so
+     * these are as slow as the accuracy allows: positions come from the clock, and the moments that matter
+     * (a command, the end of a song) are read fast anyway.
+     */
+    public const WATCHED_INTERVAL = 2.0;
 
-    public const RECENT_INTERVAL = 5.0;
+    public const IDLE_WATCHED_INTERVAL = 4.0;
+
+    /** Nobody has done anything for 15 minutes to an hour. */
+    public const QUIET_PLAYING_INTERVAL = 10.0;
+
+    public const QUIET_PAUSED_INTERVAL = 30.0;
+
+    /** Nobody has done anything for an hour or more: the room only needs to notice that the music started or stopped. */
+    public const SLEEPING_PLAYING_INTERVAL = 30.0;
+
+    public const SLEEPING_PAUSED_INTERVAL = 60.0;
+
+    public const RECENT_INTERVAL = 10.0;
 
     /** Spotify trails its own audio by a moment; an 'other' command is given this long before its read is trusted. */
     private const SETTLE_SECONDS = 0.8;
@@ -44,9 +65,9 @@ class RoomWatcher
     /** ...until this long after it. */
     private const END_WINDOW_AFTER_MS = 2000;
 
-    private const QUEUE_REFRESH_SECONDS = 5;
+    private const QUEUE_REFRESH_SECONDS = 10;
 
-    private const DEVICES_REFRESH_SECONDS = 10;
+    private const DEVICES_REFRESH_SECONDS = 30;
 
     public function __construct(private PlaybackSync $sync, private SpotifyClientFactory $clients, private QueueFeeder $feeder) {}
 
@@ -61,11 +82,34 @@ class RoomWatcher
 
         $base = match (true) {
             $since === null => null,
-            $since <= WatchState::WATCHING_SECONDS => self::WATCHED_INTERVAL,
-            default => self::RECENT_INTERVAL,
+            $since <= WatchState::WATCHING_SECONDS => $this->pace($room),
+            default => max(self::RECENT_INTERVAL, $this->pace($room)),
         };
 
         return $base === null ? null : $this->aroundTrackEnd($room, $base);
+    }
+
+    /**
+     * How often a room somebody has open is read. Mostly it is about what people are doing: while they press
+     * things, accuracy matters and it is read every couple of seconds; when nobody has done anything for a
+     * while the music just plays, positions come from the clock, and only a change made in the Spotify app
+     * needs noticing, which a slower read does fine. Around the end of a song it is read fast either way.
+     */
+    private function pace(Room $room): float
+    {
+        return match ($room->activityTier()) {
+            'active' => $room->is_playing ? self::WATCHED_INTERVAL : self::IDLE_WATCHED_INTERVAL,
+            'quiet' => $room->is_playing ? self::QUIET_PLAYING_INTERVAL : self::QUIET_PAUSED_INTERVAL,
+            default => $room->is_playing ? self::SLEEPING_PLAYING_INTERVAL : self::SLEEPING_PAUSED_INTERVAL,
+        };
+    }
+
+    /** Is this room due for a look? A command, or a person waking it, cannot be made to wait for the schedule. */
+    public function isDue(Room $room, ?float $dueAt): bool
+    {
+        $woken = WatchState::takeWake($room);
+
+        return $dueAt === null || microtime(true) >= $dueAt || $woken || WatchState::burst($room) !== null;
     }
 
     /**

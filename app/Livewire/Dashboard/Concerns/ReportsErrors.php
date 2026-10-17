@@ -45,6 +45,7 @@ trait ReportsErrors
         $specific = match (true) {
             $failure->deviceAsleep() => 'SP-ASLEEP',
             $failure->premiumRequired() => 'SP-PREMIUM',
+            $failure->rateLimited() => 'SP-QUOTA',
             default => $code,
         };
 

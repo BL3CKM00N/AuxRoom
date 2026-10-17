@@ -42,6 +42,17 @@ class WatchState
         return Cache::get('watcher:heartbeat') !== null;
     }
 
+    /** Somebody did something in a room that was resting: look at it now, whatever the watcher was waiting for. */
+    public static function wake(Room $room): void
+    {
+        Cache::put("watch:wake:{$room->id}", 1, 60);
+    }
+
+    public static function takeWake(Room $room): bool
+    {
+        return Cache::pull("watch:wake:{$room->id}") !== null;
+    }
+
     /** Spotify was just asked about this room (by the watcher or a page) and answered. */
     public static function markVerified(Room $room): void
     {

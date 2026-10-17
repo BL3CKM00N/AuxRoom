@@ -34,6 +34,14 @@ surprising is learned, delete lines that stop being true.
 - Opening a room that nobody has confirmed lately (a new room, or an unwatched one) makes the page read Spotify once itself
   (`PlaybackSync::refreshIfStale`, guarded by `WatchState::verifiedAge`), so the first render shows the song. A push sent before the page's
   websocket was ready is lost, so `echo.js` announces `realtime-connected` and the room pages re-read once when it comes up.
+- How often a room is read depends on what people are doing in it (`Room::activityTier`, `last_activity_at`): active (someone did something in
+  the last 15 min) 2 s playing / 4 s paused; quiet (to 1 h) 10 s / 30 s; sleeping (over 1 h) 30 s / 60 s; always 0.3 s around a song's end and
+  after a command. "Doing something" is `Room::markActive()`: opening a room, a control (`passesGate`), anything logged, a join. A screen's own
+  polling never counts, or a forgotten tab would keep a room awake for ever. Waking a resting room sets `WatchState::wake`, which the watcher
+  honours at once (`RoomWatcher::isDue`).
+- One Spotify app may send `SpotifyBudget::READS_PER_MINUTE` (120) reads a minute, however many rooms and screens there are; commands are exempt.
+  A read that is denied reads as a short 429 ("wait for the next minute"), and a failed read of devices or the queue returns the last known list
+  instead of an empty one, so the room never claims "no device" just because it could not ask.
 - Positions are kept to the millisecond: `rooms.now_playing_started_ms` (the datetime column only holds whole seconds, which made every
   position up to a second wrong). Setting `now_playing_started_at` fills both through a mutator. `Room::positionAtMs()` and `startedAtMs()`
   use it. Spotify's `progress_ms` is as of halfway through the request, so `PlaybackSync` pins it to that moment (`fetched_at_ms`).
@@ -58,6 +66,12 @@ surprising is learned, delete lines that stop being true.
 - `GET /me/player` returns 204 when no device is active. A sleeping iPhone shows as 502 "Bad gateway" on commands.
 - The queue cannot be edited: no remove, no reorder, no clear. Everything about the waiting list follows from that.
 - Smart Shuffle cannot be turned on through the API (`state=smart` returns 400). It is only readable (`smart_shuffle`, undocumented).
+- The player endpoints (`/me/player`, its queue, devices and every command) have their own strict quota per Spotify *app* (client id), not per
+  listener. When it runs out Spotify answers 429 `QUOTA_EXCEEDED` with a `Retry-After` that can be hours (we saw about 12), while `/me` and search
+  keep working. `SpotifyBudget` remembers the first 429 per app and every caller stays quiet until it is over; the room says "Spotify is
+  limiting AuxRoom" (guide `SP-QUOTA`) instead of "no device found", and `/health/watcher` goes 503 with the time left. A second Spotify app has
+  its own quota. Steady polling is deliberately slow (2 s watched and playing, 4 s paused, 10 s recently watched; 0.3 s only around a song's end
+  or after a command): one read a second is 86,400 requests a day for as long as a screen is open. `spotify:calls:*` counts requests per hour.
 - `supports_volume` is false for some devices; the volume number then means nothing.
 - Spotify pads its queue with the playlist wrapped around, repeating the current track. `UpcomingQueue::trim` removes that.
 - The API key per room is the host's own Spotify app credentials; tokens refresh on use. Image URLs are on `*.scdn.co`.

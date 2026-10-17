@@ -184,7 +184,7 @@ class PlaybackAccuracyTest extends TestCase
 
     public function test_mid_song_the_room_is_read_at_the_normal_pace(): void
     {
-        $this->assertSame(1.0, $this->cadenceAt(100000));
+        $this->assertSame(RoomWatcher::WATCHED_INTERVAL, $this->cadenceAt(100000));
     }
 
     public function test_the_last_second_and_a_half_and_the_two_after_are_read_fast(): void
@@ -192,7 +192,7 @@ class PlaybackAccuracyTest extends TestCase
         $this->assertSame(0.3, $this->cadenceAt(198800), '1.2 s before the end');
         $this->assertSame(0.3, $this->cadenceAt(200000), 'at the end');
         $this->assertSame(0.3, $this->cadenceAt(201900), 'just after: Spotify moves on a little late');
-        $this->assertSame(1.0, $this->cadenceAt(203000), 'well after: the room is stale or repeating, so normal');
+        $this->assertSame(RoomWatcher::WATCHED_INTERVAL, $this->cadenceAt(203000), 'well after: the room is stale or repeating, so normal');
     }
 
     public function test_a_slow_cadence_is_shortened_so_the_next_read_lands_when_the_window_opens(): void
@@ -210,8 +210,8 @@ class PlaybackAccuracyTest extends TestCase
 
     public function test_a_paused_room_or_one_on_repeat_has_no_end_window(): void
     {
-        $this->assertSame(1.0, $this->cadenceAt(199000, ['is_playing' => false, 'now_playing_position_ms' => 199000]));
-        $this->assertSame(1.0, $this->cadenceAt(199000, ['repeat_mode' => 'track']));
+        $this->assertSame(RoomWatcher::IDLE_WATCHED_INTERVAL, $this->cadenceAt(199000, ['is_playing' => false, 'now_playing_position_ms' => 199000]), 'paused: slower still, and no end window');
+        $this->assertSame(RoomWatcher::WATCHED_INTERVAL, $this->cadenceAt(199000, ['repeat_mode' => 'track']));
     }
 
     public function test_an_unwatched_room_is_still_not_read_at_all(): void

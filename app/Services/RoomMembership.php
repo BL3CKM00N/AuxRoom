@@ -111,6 +111,8 @@ class RoomMembership
             'message' => "{$member->display_name} joined the room.",
         ]);
 
+        $room->markActive();
+
         RoomUpdated::broadcastFor($room, 'members');
 
         return $member;

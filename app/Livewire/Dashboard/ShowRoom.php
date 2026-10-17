@@ -87,6 +87,7 @@ class ShowRoom extends Component
 
         // A new room, or one nobody was watching, has nothing stored yet: ask Spotify now so the first render shows the song.
         if ($found->isApproved()) {
+            $room->markActive();   // opening the room is something a person did
             app(PlaybackSync::class)->refreshIfStale($room);
         }
 
@@ -359,6 +360,9 @@ class ShowRoom extends Component
 
     private function logActivity(string $type, string $message): void
     {
+        // Everything a person does here is logged, so it is the one place to note that somebody is around.
+        $this->room->markActive();
+
         ActivityEvent::create([
             'room_id' => $this->room->id,
             'member_id' => $this->member->id,

@@ -94,7 +94,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
         if (! $response || $response->failed()) {
             Log::warning('Spotify device listing failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
-            $devices = [];
+            // An answer we could not get is not "there are no devices": keep showing the last list we did get.
+            $devices = Cache::get($key.':last', []);
         } else {
             $devices = collect($response->json('devices', []))->map(fn (array $device) => [
                 'id' => $device['id'],
@@ -102,6 +103,8 @@ class SpotifyWebApiClient implements SpotifyClientContract
                 'type' => $device['type'],
                 'is_active' => $device['is_active'],
             ])->all();
+
+            Cache::put($key.':last', $devices, 86400);
         }
 
         // Written even on a fresh read (and on failure, so an outage or rate
@@ -299,6 +302,11 @@ class SpotifyWebApiClient implements SpotifyClientContract
         }
 
         app(CommandFailure::class)->clear();
+
+        if ($this->commandBlocked($url)) {
+            return false;
+        }
+
         $response = $this->send('post', $url);
         $this->forgetCachedReads();
 
@@ -323,9 +331,11 @@ class SpotifyWebApiClient implements SpotifyClientContract
         if (! $response || $response->failed()) {
             Log::warning('Spotify queue fetch failed', ['status' => $response?->status(), 'body' => $response?->body()]);
 
-            Cache::put($key, [], self::QUEUE_TTL_SECONDS);
+            // Not being able to read the queue is not an empty queue: keep the last one we did read.
+            $last = Cache::get($key.':last', []);
+            Cache::put($key, $last, self::QUEUE_TTL_SECONDS);
 
-            return [];
+            return $last;
         }
 
         $queue = collect($response->json('queue', []))
@@ -343,6 +353,7 @@ class SpotifyWebApiClient implements SpotifyClientContract
             ->all();
 
         Cache::put($key, $queue, self::QUEUE_TTL_SECONDS);
+        Cache::put($key.':last', $queue, 86400);
 
         return $queue;
     }
@@ -435,8 +446,18 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     public function getPlaybackState(): ?array
     {
+        // Spotify said to stop asking: say so, with how long, so the watcher waits exactly that long instead of guessing.
+        if ($wait = SpotifyBudget::playerRemaining($this->account)) {
+            throw SpotifyRequestFailed::withStatus('Spotify is limiting this app', 429, $wait);
+        }
+
         $sentAt = microtime(true);
         $response = $this->get('https://api.spotify.com/v1/me/player');
+
+        // This minute's allowance of reads is gone: not a failure of Spotify's, so the watcher just waits for the next minute.
+        if (! $response && $this->deniedFor) {
+            throw SpotifyRequestFailed::withStatus('This minute\'s allowance of Spotify reads is used up', 429, $this->deniedFor);
+        }
 
         return $this->playbackStateFrom($response, $this->midpointMs($response, $sentAt));
     }
@@ -459,6 +480,9 @@ class SpotifyWebApiClient implements SpotifyClientContract
      */
     public function playbackStateFrom(?Response $response, float $fetchedAtMs): ?array
     {
+        // A pooled answer did not go through get(), so a 429 in it is noted here (noting twice is harmless).
+        SpotifyBudget::noteResponse($this->account, 'https://api.spotify.com/v1/me/player', $response);
+
         if (! $response) {
             throw new SpotifyRequestFailed('Spotify playback state could not be fetched');
         }
@@ -514,7 +538,16 @@ class SpotifyWebApiClient implements SpotifyClientContract
      */
     public function addPlaybackStateRequest(Pool $pool, string $key): void
     {
+        if ($wait = SpotifyBudget::playerRemaining($this->account)) {
+            throw SpotifyRequestFailed::withStatus('Spotify is limiting this app', 429, $wait);
+        }
+
+        if ($wait = SpotifyBudget::takeRead($this->account)) {
+            throw SpotifyRequestFailed::withStatus('This minute\'s allowance of Spotify reads is used up', 429, $wait);
+        }
+
         $this->http(self::READ_TIMEOUT_SECONDS);   // refreshes the token first, if it needs it
+        SpotifyBudget::countCall($this->account);
 
         $pool->as($key)->withToken($this->account->access_token)->acceptJson()->timeout(self::READ_TIMEOUT_SECONDS)->get('https://api.spotify.com/v1/me/player');
     }
@@ -552,6 +585,11 @@ class SpotifyWebApiClient implements SpotifyClientContract
         }
 
         app(CommandFailure::class)->clear();
+
+        if ($this->commandBlocked($url)) {
+            return false;
+        }
+
         $response = $this->send('put', $url, $body);
         $this->forgetCachedReads();
 
@@ -569,16 +607,56 @@ class SpotifyWebApiClient implements SpotifyClientContract
 
     private function get(string $url, array $query = []): ?Response
     {
-        return $this->attempt(fn () => $this->http(self::READ_TIMEOUT_SECONDS)->get($url, $query));
+        $this->deniedFor = null;
+
+        if (SpotifyBudget::remaining($this->account, $url)) {
+            return null;
+        }
+
+        if ($wait = SpotifyBudget::takeRead($this->account)) {
+            $this->deniedFor = $wait;
+
+            return null;
+        }
+
+        $response = $this->attempt(fn () => $this->http(self::READ_TIMEOUT_SECONDS)->get($url, $query));
+        $this->afterRequest($url, $response);
+
+        return $response;
+    }
+
+    /** Counts the request, and remembers it if Spotify said to slow down. */
+    /** Set by get() when the minute's allowance of reads was gone, so it did not even try. */
+    private ?int $deniedFor = null;
+
+    private function afterRequest(string $url, ?Response $response): void
+    {
+        SpotifyBudget::countCall($this->account);
+        SpotifyBudget::noteResponse($this->account, $url, $response);
+    }
+
+    /** True while Spotify has told this app to stop asking about playback; a command is then not even sent. */
+    private function commandBlocked(string $url): bool
+    {
+        if (! SpotifyBudget::remaining($this->account, $url)) {
+            return false;
+        }
+
+        app(CommandFailure::class)->record(429, json_encode(['error' => ['status' => 429, 'reason' => 'QUOTA_EXCEEDED', 'message' => 'Spotify is limiting this app']]));
+
+        return true;
     }
 
     private function send(string $method, string $url, array $body = []): ?Response
     {
-        return $this->attempt(function () use ($method, $url, $body) {
+        $response = $this->attempt(function () use ($method, $url, $body) {
             $request = $this->http(self::COMMAND_TIMEOUT_SECONDS)->asJson();
 
             return $method === 'put' ? $request->put($url, $body) : $request->post($url);
         });
+        $this->afterRequest($url, $response);
+
+        return $response;
     }
 
     /**

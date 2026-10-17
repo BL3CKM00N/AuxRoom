@@ -12,22 +12,25 @@
             // reflects what Spotify Connect currently reports, same signal
             // the device picker in Room Settings uses to hide itself.
             $spotifyDisconnected = $this->spotifyNeedsReconnect;
+            // Spotify's quota for this app ran out: nothing can be read, so "no device" would only be a guess.
+            $limitedFor = $spotifyDisconnected ? null : $this->spotifyLimited;
+            $spotifyLimited = $limitedFor !== null;
             // Inactive: Spotify reported no active device since playback last ran,
             // so the stored track is hidden (kept only for resuming).
-            $noDeviceAvailable = ! $spotifyDisconnected && ! $this->isMock
+            $noDeviceAvailable = ! $spotifyDisconnected && ! $spotifyLimited && ! $this->isMock
                 && ($room->playbackInactive() || (! $this->nowPlaying && ! $room->fallbackIsShown() && empty($this->devices)));
             // The playlist ran out with repeat off (Spotify parks on its first
             // track, which isn't shown as current). Device problems take priority.
-            $playlistFinished = ! $spotifyDisconnected && ! $noDeviceAvailable && $room->playlistFinished();
+            $playlistFinished = ! $spotifyDisconnected && ! $spotifyLimited && ! $noDeviceAvailable && $room->playlistFinished();
             // A: no playback device exists at all (or Spotify is disconnected). Nothing can start,
             // so every playback and queue control is hidden. The list is only trusted while
             // nothing is playing, so a failed device lookup mid-song cannot hide the controls.
             $deviceListed = ! empty($this->devices);
-            $playbackUnavailable = $spotifyDisconnected
+            $playbackUnavailable = $spotifyDisconnected || $spotifyLimited
                 || (! $this->isMock && ! $deviceListed && ! ($this->nowPlaying || $room->fallbackIsShown()));
             // B: a device is listed but nothing is active. Play, search and the playlist picker can
             // still wake it, but there is no shuffle/skip/repeat to offer and no queue to show.
-            $hideQueue = $spotifyDisconnected || $noDeviceAvailable;
+            $hideQueue = $spotifyDisconnected || $spotifyLimited || $noDeviceAvailable;
         @endphp
         <div class="order-1 p-6 rounded-xl bg-gradient-to-br from-aux-card to-aux-bg border border-aux-border" x-data="{ tools: false }">
             <div class="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
@@ -40,15 +43,15 @@
                 </div>
                 <div class="w-full min-w-0 sm:flex-1">
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-aux-accent">
-                        <x-icon name="note" class="w-3.5 h-3.5" /> {{ $spotifyDisconnected ? 'Spotify disconnected' : ($noDeviceAvailable ? ($deviceListed ? 'Not playing' : 'No device found') : ($playlistFinished ? 'Playlist finished' : ($room->is_playing ? 'Now spinning' : 'On pause'))) }}
+                        <x-icon name="note" class="w-3.5 h-3.5" /> {{ $spotifyDisconnected ? 'Spotify disconnected' : ($spotifyLimited ? 'Spotify is limiting AuxRoom for about '.\App\Services\Spotify\SpotifyBudget::humanize($limitedFor) : ($noDeviceAvailable ? ($deviceListed ? 'Not playing' : 'No device found') : ($playlistFinished ? 'Playlist finished' : ($room->is_playing ? 'Now spinning' : 'On pause')))) }}
                     </span>
                     @if ($room->smartShuffleOn() && ! $spotifyDisconnected && ! $noDeviceAvailable)
                         <span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-aux-accent-soft text-aux-accent text-[10px] font-semibold align-middle" title="Spotify shuffles the playlist and mixes in recommended songs">
                             <x-icon name="zap" class="w-3 h-3" /> Smart Shuffle
                         </span>
                     @endif
-                    <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($playlistFinished ? 'End of the playlist' : ($room->fallbackIsShown() ? $room->fallback_playlist_name : ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($noDeviceAvailable ? 'Nothing\'s playing anywhere' : 'Nothing queued yet')))) }}</h2>
-                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($playlistFinished ? 'Press play to start it again.' : ($room->fallbackIsShown() ? 'Playlist · shuffled' : ($spotifyDisconnected ? ($this->isHost ? 'Reconnect it in Room Settings.' : 'The host needs to reconnect Spotify.') : ($noDeviceAvailable ? ($deviceListed ? 'Press play to resume, or start something in Spotify.' : 'Open Spotify on a phone, computer, or speaker, then come back here.') : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track'))))) }}</p>
+                    <h2 class="text-2xl font-bold mt-1 truncate">{{ $this->nowPlaying->name ?? ($playlistFinished ? 'End of the playlist' : ($room->fallbackIsShown() ? $room->fallback_playlist_name : ($spotifyDisconnected ? 'Spotify needs to be reconnected' : ($spotifyLimited ? 'Waiting for Spotify' : ($noDeviceAvailable ? 'Nothing\'s playing anywhere' : 'Nothing queued yet'))))) }}</h2>
+                    <p class="text-aux-muted truncate">{{ $this->nowPlaying->artist ?? ($playlistFinished ? 'Press play to start it again.' : ($room->fallbackIsShown() ? 'Playlist · shuffled' : ($spotifyDisconnected ? ($this->isHost ? 'Reconnect it in Room Settings.' : 'The host needs to reconnect Spotify.') : ($spotifyLimited ? 'AuxRoom cannot see playback right now. Your music keeps playing.' : ($noDeviceAvailable ? ($deviceListed ? 'Press play to resume, or start something in Spotify.' : 'Open Spotify on a phone, computer, or speaker, then come back here.') : ($this->isMock ? 'Connect Spotify to add a track' : 'Search below to add the first track')))))) }}</p>
 
                     @php
                         // The transport controls are always shown (greyed out when there is

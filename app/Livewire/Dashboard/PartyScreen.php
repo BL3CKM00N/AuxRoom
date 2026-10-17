@@ -27,6 +27,7 @@ class PartyScreen extends Component
         $this->room = $room;
         WatchState::touch($room);
 
+        $room->markActive();   // putting the party screen up is something a person did
         app(PlaybackSync::class)->refreshIfStale($room);
     }
 

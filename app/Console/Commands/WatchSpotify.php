@@ -38,7 +38,7 @@ class WatchSpotify extends Command
             $ready = [];
 
             foreach ($rooms as $room) {
-                if (! $once && microtime(true) < ($due[$room->id] ?? 0)) {
+                if (! $once && ! $watcher->isDue($room, $due[$room->id] ?? null)) {
                     continue;
                 }
 
@@ -51,6 +51,9 @@ class WatchSpotify extends Command
 
                 $ready[] = $room;
             }
+
+            // The same room should not always be first in line when Spotify's allowance runs short.
+            shuffle($ready);
 
             // Rooms that are due together are asked at the same time, so one slow answer does not hold up the rest.
             $answers = $watcher->prefetch(collect($ready));

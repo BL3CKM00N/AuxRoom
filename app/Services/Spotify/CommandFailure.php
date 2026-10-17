@@ -57,6 +57,12 @@ class CommandFailure
             || $this->status === 404;
     }
 
+    /** Spotify's quota for this app is used up (or the app already knew it was, and did not even ask). */
+    public function rateLimited(): bool
+    {
+        return $this->status === 429 || $this->reason === 'QUOTA_EXCEEDED';
+    }
+
     public function premiumRequired(): bool
     {
         return $this->reason === 'PREMIUM_REQUIRED';
@@ -71,6 +77,10 @@ class CommandFailure
 
         if ($this->premiumRequired()) {
             return 'Spotify only lets Premium accounts control playback.';
+        }
+
+        if ($this->rateLimited()) {
+            return 'Spotify is limiting what AuxRoom may ask it for a while. Music already playing is not affected, and controls come back by themselves.';
         }
 
         return $generic;

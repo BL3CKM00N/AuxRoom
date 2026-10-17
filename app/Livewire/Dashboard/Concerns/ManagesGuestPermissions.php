@@ -84,6 +84,9 @@ trait ManagesGuestPermissions
             return false;
         }
 
+        // A control was pressed (play, skip, seek, volume, adding a song): somebody is here.
+        $this->room->markActive();
+
         return true;
     }
 

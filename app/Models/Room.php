@@ -51,6 +51,7 @@ class Room extends Model
         'now_playing_tint',
         'waiting_list_enabled',
         'rotation_enabled',
+        'last_activity_at',
     ];
 
     protected function casts(): array
@@ -63,6 +64,7 @@ class Room extends Model
             'smart_shuffle_enabled' => 'boolean',
             'volume_supported' => 'boolean',
             'block_explicit' => 'boolean',
+            'last_activity_at' => 'datetime',
             'waiting_list_enabled' => 'boolean',
             'rotation_enabled' => 'boolean',
             'now_playing_explicit' => 'boolean',
@@ -119,6 +121,44 @@ class Room extends Model
                 'now_playing_started_ms' => $time ? $time->getTimestamp() * 1000 + intdiv($time->micro, 1000) : null,
             ];
         });
+    }
+
+    /** A person did something here recently: the room is read from Spotify as often as accuracy needs. */
+    public const ACTIVE_FOR_SECONDS = 900;
+
+    /** After this long without anyone doing anything, the room is read only now and then. */
+    public const QUIET_FOR_SECONDS = 3600;
+
+    /** @return 'active'|'quiet'|'idle' */
+    public function activityTier(): string
+    {
+        $since = ($this->last_activity_at ?? $this->created_at)?->diffInSeconds(now(), true) ?? 0;
+
+        return match (true) {
+            $since < self::ACTIVE_FOR_SECONDS => 'active',
+            $since < self::QUIET_FOR_SECONDS => 'quiet',
+            default => 'idle',
+        };
+    }
+
+    /**
+     * Something a person did (pressed a control, added a song, joined, opened the room), as opposed to a screen
+     * refreshing itself. It decides how often Spotify is asked about the room, and ends a quiet spell at once.
+     */
+    public function markActive(): void
+    {
+        $was = $this->activityTier();
+
+        // Pressing play and then skip is two actions, not two writes.
+        if ($was === 'active' && $this->last_activity_at && $this->last_activity_at->diffInSeconds(now(), true) < 30) {
+            return;
+        }
+
+        $this->forceFill(['last_activity_at' => now()])->saveQuietly();
+
+        if ($was !== 'active') {
+            \App\Services\Spotify\WatchState::wake($this);
+        }
     }
 
     public function getRouteKeyName(): string
